@@ -7,7 +7,6 @@ import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
@@ -20,14 +19,13 @@ const val TAG = "FACE RECOGNIZER"
 class FaceRecogniser(
     context: Context,
     private val mode: RecognitionMode,
-    private val extras: MutableList<String>,
     private val faceEmbedding: String,
-    private val capture: MutableState<Boolean>,
-    private val boundingBoxColor: MutableState<Color>,
     private val drawFaceBoxes: (List<Rect>, imageSize: Pair<Int, Int>) -> Unit,
-    private val onCapture: (images: List<DisplayImage>, result: Embedding?) -> Unit,
-    private val onErrorDetected: (String?) -> Unit,
-    private val onRecognitionComplete: ((success: Boolean) -> Unit)? = null,
+    private val onCapture: (images: List<DisplayImage>) -> Unit,
+    private val onFaceDetected: () -> Unit,
+    private val onFaceRecognised: (Embedding) -> Unit,
+    private val onErrorDetected: (String) -> Unit,
+    private val onVerificationComplete: ((success: Boolean) -> Unit)? = null,
 ) : ImageAnalysis.Analyzer {
 
     private val detector = FaceDetection.getClient()
@@ -41,9 +39,6 @@ class FaceRecogniser(
 
     override fun analyze(image: ImageProxy) {
         val imageBitmap = getBitmap(image)
-        if (capture.value){
-            extras.add("mode: $mode")
-            extras.add("given embedding: ${faceEmbedding.length}") }
 
         imageBitmap?.let {
             val inputImage = InputImage.fromBitmap(imageBitmap, 0)
@@ -55,9 +50,9 @@ class FaceRecogniser(
                 if (faces.size > 1) {
                     onErrorDetected.invoke("Multiple faces detected")
                 }
-                else if (capture.value && faces.size == 1) {
-                    onErrorDetected.invoke(null)
+                else if (faces.size == 1) {
 
+                    onFaceDetected.invoke()
                     val detectedFace = faces.first().boundingBox
 
                     try {
@@ -68,23 +63,19 @@ class FaceRecogniser(
                             detectedFace.width(),
                             detectedFace.height(),
                         )
-                        val scaledFaceBitmap = Bitmap.createScaledBitmap(faceBitmap, 112, 112, true)
+                        val scaledFaceBitmap = Bitmap.createScaledBitmap(faceBitmap, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, true)
 
                         val recognitionResult = recogniser.recognizeImage(scaledFaceBitmap, true)
                         val embedding = recognitionResult.first().extra
                         val result = if (recognitionResult.isNotEmpty()) {
                                 Embedding.embeddingStringFromJavaObject(embedding)
                         } else null
-
-                        extras.add("detected embedding: ${result?.embedding?.length}")
                         result?.let {
+                            onFaceRecognised.invoke(result)
+                            Log.e("[MODE]", mode.toString())
                             if (mode == RecognitionMode.VERIFY){
-                                val sameFace = sameFace(faceEmbedding, embedding.first())
-                                extras.add("verification Successful: $sameFace")
-                                onRecognitionComplete?.invoke(sameFace)
-                                if (sameFace){
-                                    boundingBoxColor.value = Color.Green
-                                }
+                                    val sameFace = sameFace(faceEmbedding, embedding.first())
+                                    onVerificationComplete?.invoke(sameFace)
                             }
                         }
                         onCapture.invoke(
@@ -101,16 +92,15 @@ class FaceRecogniser(
                                     description = "scaled face"
                                 )
                             ),
-                            result,
                         )
                     }
                     catch (ex: java.lang.IllegalArgumentException) {
-                        Log.d("FACE BMP CREATION FAILED", "Face is out of preview bounds")
+                        Log.d("FACE BMP CREATION FAILED", "Face is out of preview bounds: ${ex.stackTraceToString()}")
                         onErrorDetected.invoke("face is not in preview")
                     }
                 }
                 else {
-                    onErrorDetected.invoke(null)
+                    onErrorDetected.invoke("")
                 }
             }.addOnFailureListener { exception ->
                 Log.d(TAG, "face detection failed. \n ${exception.stackTraceToString()}")

@@ -21,7 +21,6 @@ import android.graphics.Bitmap;
 import android.graphics.RectF;
 import android.os.Trace;
 import android.util.Log;
-import android.util.Pair;
 
 import org.tensorflow.lite.Interpreter;
 
@@ -42,12 +41,12 @@ import java.util.Vector;
 
 /**
  * Wrapper for frozen detection models trained using the Tensorflow Object Detection API:
- * - https://github.com/tensorflow/models/tree/master/research/object_detection
+ * - <a href="https://github.com/tensorflow/models/tree/master/research/object_detection">...</a>
  * where you can find the training code.
  *
  * To use pretrained models in the API or convert to TF Lite models, please see docs for details:
- * - https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md
- * - https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/running_on_mobile_tensorflowlite.md#running-our-model-on-android
+ * - <a href="https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md">...</a>
+ * - <a href="https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/running_on_mobile_tensorflowlite.md#running-our-model-on-android">...</a>
  */
 public class TFLiteObjectDetectionAPIModel
         implements SimilarityClassifier {
@@ -55,49 +54,28 @@ public class TFLiteObjectDetectionAPIModel
   //private static final int OUTPUT_SIZE = 512;
   private static final int OUTPUT_SIZE = 192;
 
-  // Only return this many results.
-  private static final int NUM_DETECTIONS = 1;
-
   // Float model
   private static final float IMAGE_MEAN = 128.0f;
   private static final float IMAGE_STD = 128.0f;
 
   // Number of threads in the java app
-  private static final int NUM_THREADS = 4;
   private boolean isModelQuantized;
   // Config values.
   private int inputSize;
   // Pre-allocated buffers.
-  private Vector<String> labels = new Vector<String>();
+  private final Vector<String> labels = new Vector<>();
   private int[] intValues;
-  // outputLocations: array of shape [Batchsize, NUM_DETECTIONS,4]
-  // contains the location of detected boxes
-  private float[][][] outputLocations;
-  // outputClasses: array of shape [Batchsize, NUM_DETECTIONS]
-  // contains the classes of detected boxes
-  private float[][] outputClasses;
-  // outputScores: array of shape [Batchsize, NUM_DETECTIONS]
-  // contains the scores of detected boxes
-  private float[][] outputScores;
-  // numDetections: array of shape [Batchsize]
-  // contains the number of detected boxes
-  private float[] numDetections;
-
-  private float[][] embeedings;
 
   private ByteBuffer imgData;
 
   private Interpreter tfLite;
 
 // Face Mask Detector Output
-  private float[][] output;
+  private static float[][] output;
 
-  private HashMap<String, Recognition> registered = new HashMap<>();
-  public void register(String name, Recognition rec) {
-      registered.put(name, rec);
+  private TFLiteObjectDetectionAPIModel(float[][] output) {
+    TFLiteObjectDetectionAPIModel.output = output;
   }
-
-  private TFLiteObjectDetectionAPIModel() {}
 
   /** Memory-map the model file in Assets. */
   private static MappedByteBuffer loadModelFile(AssetManager assets, String modelFilename)
@@ -127,10 +105,9 @@ public class TFLiteObjectDetectionAPIModel
       final boolean isQuantized)
       throws IOException {
 
-    final TFLiteObjectDetectionAPIModel d = new TFLiteObjectDetectionAPIModel();
+    final TFLiteObjectDetectionAPIModel d = new TFLiteObjectDetectionAPIModel(output);
 
-    String actualFilename = labelFilename;
-    InputStream labelsInput = assetManager.open(actualFilename);
+    InputStream labelsInput = assetManager.open(labelFilename);
     BufferedReader br = new BufferedReader(new InputStreamReader(labelsInput));
     String line;
     while ((line = br.readLine()) != null) {
@@ -154,39 +131,11 @@ public class TFLiteObjectDetectionAPIModel
     } else {
       numBytesPerChannel = 4; // Floating point
     }
-    d.imgData = ByteBuffer.allocateDirect(1 * d.inputSize * d.inputSize * 3 * numBytesPerChannel);
+    d.imgData = ByteBuffer.allocateDirect(d.inputSize * d.inputSize * 3 * numBytesPerChannel);
     d.imgData.order(ByteOrder.nativeOrder());
     d.intValues = new int[d.inputSize * d.inputSize];
 
-    d.outputLocations = new float[1][NUM_DETECTIONS][4];
-    d.outputClasses = new float[1][NUM_DETECTIONS];
-    d.outputScores = new float[1][NUM_DETECTIONS];
-    d.numDetections = new float[1];
     return d;
-  }
-
-  // looks for the nearest embeeding in the dataset (using L2 norm)
-  // and retrurns the pair <id, distance>
-  private Pair<String, Float> findNearest(float[] emb) {
-
-    Pair<String, Float> ret = null;
-    for (Map.Entry<String, Recognition> entry : registered.entrySet()) {
-        final String name = entry.getKey();
-        final float[] knownEmb = ((float[][]) entry.getValue().getExtra())[0];
-
-        float distance = 0;
-        for (int i = 0; i < emb.length; i++) {
-              float diff = emb[i] - knownEmb[i];
-              distance += diff*diff;
-        }
-        distance = (float) Math.sqrt(distance);
-        if (ret == null || distance < ret.second) {
-            ret = new Pair<>(name, distance);
-        }
-    }
-
-    return ret;
-
   }
 
 
@@ -233,7 +182,7 @@ public class TFLiteObjectDetectionAPIModel
 // Here outputMap is changed to fit the Face Mask detector
     Map<Integer, Object> outputMap = new HashMap<>();
 
-    embeedings = new float[1][OUTPUT_SIZE];
+    float[][] embeedings = new float[1][OUTPUT_SIZE];
     outputMap.put(0, embeedings);
 
 
@@ -243,29 +192,10 @@ public class TFLiteObjectDetectionAPIModel
     tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
     Trace.endSection();
 
-//    String res = "[";
-//    for (int i = 0; i < embeedings[0].length; i++) {
-//      res += embeedings[0][i];
-//      if (i < embeedings[0].length - 1) res += ", ";
-//    }
-//    res += "]";
-
 
     float distance = Float.MAX_VALUE;
     String id = "0";
     String label = "?";
-
-    if (registered.size() > 0) {
-        //LOGGER.i("dataset SIZE: " + registered.size());
-        final Pair<String, Float> nearest = findNearest(embeedings[0]);
-        if (nearest != null) {
-
-            final String name = nearest.first;
-            label = name;
-            distance = nearest.second;
-        }
-    }
-
 
     final int numDetectionsOutput = 1;
     final ArrayList<Recognition> recognitions = new ArrayList<>(numDetectionsOutput);

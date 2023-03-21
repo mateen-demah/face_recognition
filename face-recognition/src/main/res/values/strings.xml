@@ -4,4 +4,16 @@
     <string name="capture">Capture</string>
     <string name="actual_image">actual image</string>
     <string name="done">Done</string>
+    <string name="enroll">Enroll</string>
+    <string name="proceed">Proceed</string>
+    <string name="searching_for_face">Searching for face ...</string>
+    <string name="faceDetected">Face Detected</string>
+    <string name="running_recognition">Detecting face features</string>
+    <string name="face_recognition_successful">Face recognition successful</string>
+    <string name="successful_verification">Successful Verification</string>
+    <string name="match_failed">Match Failed</string>
+    <string name="checkmark">✓</string>
+    <string name="close">Close</string>
+    <string name="retry">Retry</string>
+    <string name="switch_camera">Switch camera</string>
 </resources>

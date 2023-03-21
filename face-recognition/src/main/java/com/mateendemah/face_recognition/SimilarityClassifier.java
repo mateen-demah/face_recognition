@@ -18,17 +18,17 @@ package com.mateendemah.face_recognition;
 import android.graphics.Bitmap;
 import android.graphics.RectF;
 
+import androidx.annotation.NonNull;
+
 import java.util.List;
 
 /** Generic interface for interacting with different recognition engines. */
 public interface SimilarityClassifier {
 
-  void register(String name, Recognition recognition);
-
   List<Recognition> recognizeImage(Bitmap bitmap, boolean getExtra);
 
   /** An immutable result returned by a Classifier describing what was recognized. */
-  public class Recognition {
+  class Recognition {
     /**
      * A unique identifier for what has been recognized. Specific to the class, not the instance of
      * the object.
@@ -45,9 +45,7 @@ public interface SimilarityClassifier {
     private float[][] extra;
 
     /** Optional location within the source image for the location of the recognized object. */
-    private RectF location;
-    private Integer color;
-    private Bitmap crop;
+    private final RectF location;
 
     public Recognition(
             final String id, final String title, final Float distance, final RectF location) {
@@ -55,9 +53,7 @@ public interface SimilarityClassifier {
       this.title = title;
       this.distance = distance;
       this.location = location;
-      this.color = null;
       this.extra = null;
-      this.crop = null;
     }
 
     public void setExtra(float[][] extra) {
@@ -67,30 +63,7 @@ public interface SimilarityClassifier {
         return this.extra;
     }
 
-    public void setColor(Integer color) {
-       this.color = color;
-    }
-
-    public String getId() {
-      return id;
-    }
-
-    public String getTitle() {
-      return title;
-    }
-
-    public Float getDistance() {
-      return distance;
-    }
-
-    public RectF getLocation() {
-      return new RectF(location);
-    }
-
-    public void setLocation(RectF location) {
-      this.location = location;
-    }
-
+    @NonNull
     @Override
     public String toString() {
       String resultString = "";
@@ -111,18 +84,6 @@ public interface SimilarityClassifier {
       }
 
       return resultString.trim();
-    }
-
-    public Integer getColor() {
-      return this.color;
-    }
-
-    public void setCrop(Bitmap crop) {
-      this.crop = crop;
-    }
-
-    public Bitmap getCrop() {
-      return this.crop;
     }
   }
 }

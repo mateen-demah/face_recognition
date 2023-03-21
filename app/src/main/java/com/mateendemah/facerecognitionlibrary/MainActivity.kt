@@ -131,10 +131,12 @@ fun Home() {
         onFaceRecognised = {
             Log.d("[NOTE_r]", it)
             tempEmbedding.value = it
+            faceRecVisible.value = false
             showPopUpForEnrollmentComplete.value = true
         },
         onFaceVerificationComplete = {
             verificationResult.value = it
+            faceRecVisible.value = false
             showPopUpForVerificationMessage.value = true
         },
         faceEmbedding = tempEmbedding.value
