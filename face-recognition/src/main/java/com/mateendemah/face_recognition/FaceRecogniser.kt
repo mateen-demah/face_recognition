@@ -20,6 +20,7 @@ class FaceRecogniser(
     context: Context,
     private val mode: RecognitionMode,
     private val faceEmbedding: String,
+    private val faceEmbeddings: List<String>,
     private val drawFaceBoxes: (List<Rect>, imageSize: Pair<Int, Int>) -> Unit,
     private val onCapture: (images: List<DisplayImage>) -> Unit,
     private val onFaceDetected: () -> Unit,
@@ -49,14 +50,18 @@ class FaceRecogniser(
 
         imageBitmap?.let {
             val inputImage = InputImage.fromBitmap(imageBitmap, 0)
-            val imgSize = inputImage.width to inputImage.height
+
+            val rotation = image.imageInfo.rotationDegrees
+            val reverseDim = rotation == 90 || rotation == 270
+            val imgSize = if(reverseDim) Pair(image.image?.height?:0, image.image?.width?:0) else Pair(inputImage.width, inputImage.height)
 
             detector.process(inputImage).addOnSuccessListener { faces ->
                 drawFaceBoxes.invoke(faces.map { it.boundingBox }, imgSize)
 
                 if (faces.size > 1) {
                     onErrorDetected.invoke("Multiple faces detected")
-                } else if (faces.size == 1) {
+                }
+                else if (faces.size == 1) {
 
                     val face = faces.first()
 
@@ -123,10 +128,10 @@ class FaceRecogniser(
                     }
 
                     // return if eyes are closed
-                    if (face.leftEyeOpenProbability == null || face.leftEyeOpenProbability!! < 0.5) {
+                    if (face.leftEyeOpenProbability == null || face.leftEyeOpenProbability!! < 0.35) {
                         onErrorDetected.invoke("Left eye closed")
                         return@addOnSuccessListener
-                    } else if (face.rightEyeOpenProbability == null || face.rightEyeOpenProbability!! < 0.5) {
+                    } else if (face.rightEyeOpenProbability == null || face.rightEyeOpenProbability!! < 0.35) {
                         onErrorDetected.invoke("Right eye closed")
                         return@addOnSuccessListener
                     }
@@ -152,11 +157,19 @@ class FaceRecogniser(
                             Embedding.embeddingStringFromJavaObject(embedding)
                         } else null
                         result?.let {
-                            onFaceRecognised.invoke(result)
-                            Log.e("[MODE]", mode.toString())
+
                             if (mode == RecognitionMode.VERIFY) {
-                                val sameFace = sameFace(faceEmbedding, embedding.first())
+                                val sameFace = isSameFace(faceEmbedding, embedding.first())
                                 onVerificationComplete?.invoke(sameFace)
+                            }
+                            else {
+                                val faceExists = faceExists(faceEmbeddings, embedding.first())
+                                if (faceExists) {
+                                    onErrorDetected.invoke("Face already exists")
+                                    return@addOnSuccessListener
+                                } else {
+                                    onFaceRecognised.invoke(result)
+                                }
                             }
                         }
                         onCapture.invoke(
@@ -181,8 +194,6 @@ class FaceRecogniser(
                         )
                         onErrorDetected.invoke("face is not in preview")
                     }
-                } else {
-                    onErrorDetected.invoke("")
                 }
             }.addOnFailureListener { exception ->
                 Log.d(TAG, "face detection failed. \n ${exception.stackTraceToString()}")
@@ -192,7 +203,7 @@ class FaceRecogniser(
         }
     }
 
-    private fun sameFace(given: String, detected: FloatArray): Boolean {
+    private fun isSameFace(given: String, detected: FloatArray): Boolean {
         val embeddingArray1 = Embedding(given).embeddingStringToJavaObject().first()
         var distance = 0f
         for (index in embeddingArray1.indices) {
@@ -202,5 +213,13 @@ class FaceRecogniser(
         distance = sqrt(distance.toDouble()).toFloat()
         Log.d("VERIFICATION CONFIDENCE", "$distance")
         return distance < 1.0f
+    }
+
+    private fun faceExists(faceList: List<String>, detectedFace: FloatArray): Boolean {
+        for (face in faceList){
+            val faceExists = isSameFace(face, detectedFace)
+            if (faceExists) return true
+        }
+        return false
     }
 }

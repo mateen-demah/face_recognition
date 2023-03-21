@@ -147,10 +147,6 @@ public class TFLiteObjectDetectionAPIModel
     Trace.beginSection("preprocessBitmap");
     // Preprocess the image data from 0-255 int to normalized float based
     // on the provided parameters.
-    Log.d("PIXELS[] SIZE",  String.valueOf(intValues.length));
-    Log.d("BMP WIDTH", String.valueOf(bitmap.getWidth()));
-    Log.d("BMP HEIGHT", String.valueOf(bitmap.getHeight()));
-    Log.d("BMP H * W", String.valueOf(bitmap.getHeight() * bitmap.getWidth()));
     bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
 
     imgData.rewind();
@@ -174,7 +170,6 @@ public class TFLiteObjectDetectionAPIModel
     // Copy the input data into TensorFlow.
     Trace.beginSection("feed");
 
-
     Object[] inputArray = {imgData};
 
     Trace.endSection();
@@ -188,7 +183,6 @@ public class TFLiteObjectDetectionAPIModel
 
     // Run the inference call.
     Trace.beginSection("run");
-    //tfLite.runForMultipleInputsOutputs(inputArray, outputMapBack);
     tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
     Trace.endSection();
 

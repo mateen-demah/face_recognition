@@ -1,9 +1,13 @@
 package com.mateendemah.facerecognitionlibrary
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,13 +16,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mateendemah.face_recognition.RecognitionMode
-import com.mateendemah.face_recognition.RecognitionUi
+import com.mateendemah.face_recognition.*
 import com.mateendemah.facerecognitionlibrary.ui.theme.FaceRecognitionLibraryTheme
 
 class MainActivity : ComponentActivity() {
@@ -40,30 +44,37 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun Home() {
-
-    val recognitionMode = remember {
-        mutableStateOf(RecognitionMode.ENROLL)
-    }
-
-    val faceRecVisible = remember {
-        mutableStateOf(false)
-    }
-
-    val embeddings = remember {
-        mutableStateListOf<Pair<String,String>>()
-    }
+    val context = LocalContext.current
 
     val tempEmbedding = remember{ mutableStateOf("") }
+    val embeddings = remember { mutableStateListOf<Pair<String,String>>() }
 
     val showPopUpForEnrollmentComplete = remember {mutableStateOf(false)}
-    val showPopUpforStartVerification = remember {
-        mutableStateOf(false)
-    }
-    val showPopUpForVerificationMessage = remember {
-        mutableStateOf(false)
-    }
-    val verificationResult = remember {
-        mutableStateOf(false)
+    val showPopUpforStartVerification = remember { mutableStateOf(false) }
+    val showPopUpForVerificationMessage = remember { mutableStateOf(false) }
+    val verificationResult = remember { mutableStateOf(false) }
+
+    val enrollIntent = Intent(context, RecognitionUI::class.java).apply { putExtra(MODE, ENROLL_MODE) }
+    val verificationIntent = Intent(context, RecognitionUI::class.java).apply { putExtra(MODE, VERIFY_MODE) }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()){ result ->
+        if (result.resultCode == Activity.RESULT_OK){
+            val mode = result.data?.getStringExtra(MODE)
+            if (mode == ENROLL_MODE){
+                val faceString = result.data?.getStringExtra(FACE_STRING)
+                faceString?.let {
+                    tempEmbedding.value = it
+                    showPopUpForEnrollmentComplete.value = true
+                }
+            }
+            else if (mode == VERIFY_MODE){
+                val success = result.data?.getBooleanExtra(VERIFICATION_SUCCESSFUL, false)
+                success?.let {
+                    verificationResult.value = it
+                    showPopUpForVerificationMessage.value = true
+                }
+            }
+        }
     }
 
     Column(
@@ -91,13 +102,12 @@ fun Home() {
             }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(onClick = {
-                recognitionMode.value = RecognitionMode.ENROLL
-                faceRecVisible.value = true
+                enrollIntent.putStringArrayListExtra(FACE_STRINGS, ArrayList(embeddings.map{it.second}))
+                             launcher.launch(enrollIntent)
             }, modifier = Modifier.weight(1f)) {
                 Text(text = stringResource(id = R.string.enroll))
             }
             Button(onClick = {
-                recognitionMode.value = RecognitionMode.VERIFY
                 showPopUpforStartVerification.value = true
             }, modifier = Modifier.weight(1f)) {
                 Text(text = stringResource(id = R.string.verify))
@@ -112,9 +122,9 @@ fun Home() {
 
     if (showPopUpforStartVerification.value){
         PopupWithInputAndTitle(title = "Enter number", onDone = {
-            recognitionMode.value = RecognitionMode.VERIFY
             tempEmbedding.value = embeddings[it.trim().toInt()-1].second
-            faceRecVisible.value = true
+            verificationIntent.putExtra(FACE_STRING, tempEmbedding.value)
+            launcher.launch(verificationIntent)
             showPopUpforStartVerification.value = false
         })
     }
@@ -124,23 +134,6 @@ fun Home() {
             showPopUpForVerificationMessage.value = false
         }
     }
-
-    RecognitionUi(
-        mode = recognitionMode.value,
-        visible = faceRecVisible,
-        onFaceRecognised = {
-            Log.d("[NOTE_r]", it)
-            tempEmbedding.value = it
-            faceRecVisible.value = false
-            showPopUpForEnrollmentComplete.value = true
-        },
-        onFaceVerificationComplete = {
-            verificationResult.value = it
-            faceRecVisible.value = false
-            showPopUpForVerificationMessage.value = true
-        },
-        faceEmbedding = tempEmbedding.value
-    )
 }
 
 @Composable
