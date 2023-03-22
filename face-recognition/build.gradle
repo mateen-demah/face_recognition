@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
+    id 'maven-publish'
 }
 
 android {
@@ -61,4 +62,17 @@ dependencies {
     // tflite
     implementation 'org.tensorflow:tensorflow-lite:+'
 
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = 'com.github.mateen-demah'
+                artifactId = 'lib-faceIdroid'
+                version = '1.0'
+            }
+        }
+    }
 }
