@@ -102,21 +102,63 @@ fun Home(faceTestDao: FaceTestDao) {
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = stringResource(id = R.string.enrolled_faces),
                         fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(3f)
                     )
-                }
+                    Column(
+                        Modifier.weight(2f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Top,
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.verifications),
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Row(Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(id = R.string.succeeded),
+                                modifier = Modifier.weight(1f),
+                                color = Color.Green,
+                                textAlign = TextAlign.Center,
+                            )
 
-                LazyColumn (verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    items(embeddings.size){
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)){
-                            Text(text = "${it + 1}")
-                            Text(embeddings[it].identifier)
+                            Text(
+                                text = stringResource(id = R.string.failed),
+                                modifier = Modifier.weight(1f),
+                                color = Color.Red,
+                                textAlign = TextAlign.Center,
+                            )
                         }
                     }
                 }
+
+                LazyColumn (verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    items(embeddings.size){
+                        Row{
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(3f)) {
+                                Text(text = "${it + 1}")
+                                Text(embeddings[it].identifier)
+                            }
+
+                            Text(
+                                text = embeddings[it].successfulVerifications.toString(),
+                                modifier = Modifier.weight(1f),
+                                color = Color.Green,
+                                textAlign = TextAlign.Center,
+                            )
+                            Text(
+                                text = (embeddings[it].verificationAttempts - embeddings[it].successfulVerifications).toString(),
+                                modifier = Modifier.weight(1f),
+                                color = Color.Red,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+
             }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(onClick = {
@@ -160,7 +202,7 @@ fun Home(faceTestDao: FaceTestDao) {
         }
     }
 
-    LaunchedEffect(Unit){
+    LaunchedEffect(showPopUpForVerificationMessage.value, showPopUpForEnrollmentComplete.value){
         coroutineScope.launch {
             val faces = withContext(Dispatchers.IO){
                 faceTestDao.getAll()

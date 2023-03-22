@@ -3,4 +3,7 @@
     <string name="enroll">Enroll</string>
     <string name="verify">Verify</string>
     <string name="enrolled_faces">Enrolled faces</string>
+    <string name="verifications">Verifications</string>
+    <string name="succeeded">succeeded</string>
+    <string name="failed">failed</string>
 </resources>
