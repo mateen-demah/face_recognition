@@ -2,12 +2,14 @@ package com.mateendemah.facerecognitionlibrary
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,10 +26,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mateendemah.face_recognition.*
 import com.mateendemah.facerecognitionlibrary.ui.theme.FaceRecognitionLibraryTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.ZonedDateTime
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val db = AppDatabase.getInstance(applicationContext)
+        val dao = db.faceTestDao()
         setContent {
             FaceRecognitionLibraryTheme {
                 // A surface container using the 'background' color from the theme
@@ -35,19 +45,22 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    Home()
+                    Home(dao)
                 }
             }
         }
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun Home() {
+fun Home(faceTestDao: FaceTestDao) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
+    val id = remember {mutableStateOf(0L)}
     val tempEmbedding = remember{ mutableStateOf("") }
-    val embeddings = remember { mutableStateListOf<Pair<String,String>>() }
+    val embeddings = remember { mutableStateListOf<FaceTest>() }
 
     val showPopUpForEnrollmentComplete = remember {mutableStateOf(false)}
     val showPopUpforStartVerification = remember { mutableStateOf(false) }
@@ -70,6 +83,11 @@ fun Home() {
             else if (mode == VERIFY_MODE){
                 val success = result.data?.getBooleanExtra(VERIFICATION_SUCCESSFUL, false)
                 success?.let {
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO){
+                            faceTestDao.recordAVerification(result = if(success) 1 else 0, id = id.value,)
+                        }
+                    }
                     verificationResult.value = it
                     showPopUpForVerificationMessage.value = true
                 }
@@ -95,14 +113,14 @@ fun Home() {
                     items(embeddings.size){
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)){
                             Text(text = "${it + 1}")
-                            Text(embeddings[it].first)
+                            Text(embeddings[it].identifier)
                         }
                     }
                 }
             }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(onClick = {
-                enrollIntent.putStringArrayListExtra(FACE_STRINGS, ArrayList(embeddings.map{it.second}))
+                enrollIntent.putStringArrayListExtra(FACE_STRINGS, ArrayList(embeddings.map{it.embedding}))
                              launcher.launch(enrollIntent)
             }, modifier = Modifier.weight(1f)) {
                 Text(text = stringResource(id = R.string.enroll))
@@ -116,13 +134,20 @@ fun Home() {
     }
 
     if (showPopUpForEnrollmentComplete.value){
-        PopupWithInputAndTitle(title = "Enter Identifier", onDone = { embeddings.add(Pair(it, tempEmbedding.value))
+        PopupWithInputAndTitle(title = "Enter Identifier", onDone = {
+//            embeddings.add(Pair(it, tempEmbedding.value))
+            coroutineScope.launch {
+                withContext(Dispatchers.IO){
+                    faceTestDao.saveAFace(FaceTest(timestamp = ZonedDateTime.now().toEpochSecond(), embedding = tempEmbedding.value, identifier = it,))
+                }
+            }
         showPopUpForEnrollmentComplete.value = false})
     }
 
     if (showPopUpforStartVerification.value){
         PopupWithInputAndTitle(title = "Enter number", onDone = {
-            tempEmbedding.value = embeddings[it.trim().toInt()-1].second
+            tempEmbedding.value = embeddings[it.trim().toInt()-1].embedding
+            id.value = embeddings[it.trim().toInt()-1].id
             verificationIntent.putExtra(FACE_STRING, tempEmbedding.value)
             launcher.launch(verificationIntent)
             showPopUpforStartVerification.value = false
@@ -132,6 +157,16 @@ fun Home() {
     if (showPopUpForVerificationMessage.value){
         BoldTextPopup(title = "", message = "Verification ${if(verificationResult.value) "Successful" else "Failed"}") {
             showPopUpForVerificationMessage.value = false
+        }
+    }
+
+    LaunchedEffect(Unit){
+        coroutineScope.launch {
+            val faces = withContext(Dispatchers.IO){
+                faceTestDao.getAll()
+            }
+            embeddings.clear()
+            embeddings.addAll(faces)
         }
     }
 }
