@@ -81,7 +81,7 @@ class RecognitionUI : ComponentActivity() {
             recMode = mode
             setContent {
                 RecognitionUi(
-                    mode = mode!!.toRecognitionMode(),
+                    mode = mode.toRecognitionMode(),
                     faceEmbedding = faceEmbedding,
                     faceEmbeddings = faceEmbeddings ?: emptyList(),
                 )

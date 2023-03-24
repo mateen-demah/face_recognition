@@ -129,10 +129,10 @@ class FaceRecogniser(
 
                     // return if eyes are closed
                     if (face.leftEyeOpenProbability == null || face.leftEyeOpenProbability!! < 0.35) {
-                        onErrorDetected.invoke("Left eye closed")
+                        onErrorDetected.invoke("Right eye closed")
                         return@addOnSuccessListener
                     } else if (face.rightEyeOpenProbability == null || face.rightEyeOpenProbability!! < 0.35) {
-                        onErrorDetected.invoke("Right eye closed")
+                        onErrorDetected.invoke("Left eye closed")
                         return@addOnSuccessListener
                     }
 
@@ -212,7 +212,7 @@ class FaceRecogniser(
         }
         distance = sqrt(distance.toDouble()).toFloat()
         Log.d("VERIFICATION CONFIDENCE", "$distance")
-        return distance < 1.0f
+        return distance < .8f
     }
 
     private fun faceExists(faceList: List<String>, detectedFace: FloatArray): Boolean {
