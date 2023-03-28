@@ -38,7 +38,7 @@ android {
         compose true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion '1.2.0'
+        kotlinCompilerExtensionVersion compose_ui_version
     }
     packagingOptions {
         resources {
@@ -62,8 +62,8 @@ dependencies {
     debugImplementation "androidx.compose.ui:ui-tooling:$compose_ui_version"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_ui_version"
 
-    // local modules
-    implementation project (":face-recognition")
+    // face recognition
+    implementation 'com.github.mateen-demah:face_recognition:ae65394161'
 
     // room database
     def room_version = "2.5.0"
