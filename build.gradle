@@ -8,3 +8,11 @@ plugins {
     id 'com.android.library' version '7.4.0' apply false
     id 'org.jetbrains.kotlin.android' version '1.6.10' apply false
 }
+
+allprojects {
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+        kotlinOptions {
+            freeCompilerArgs += '-Xjvm-default=compatibility'
+        }
+    }
+}
