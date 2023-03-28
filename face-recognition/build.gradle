@@ -45,9 +45,9 @@ dependencies {
 ////    implementation 'com.android.support.constraint:constraint-layout:2.0.4'
 //    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
 
-    implementation 'androidx.activity:activity-compose:1.3.1'
+    implementation "androidx.activity:activity-compose:$compose_ui_version"
     implementation "androidx.compose.ui:ui:$compose_ui_version"
-    implementation 'androidx.compose.material:material:1.2.0'
+    implementation "androidx.compose.material:material:$compose_ui_version"
 
     // camera X
     def camerax_version = "1.2.1"
