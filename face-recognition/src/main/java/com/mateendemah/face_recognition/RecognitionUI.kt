@@ -15,10 +15,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
@@ -27,12 +25,13 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -45,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
 
 class RecognitionUI : ComponentActivity() {
 
@@ -57,6 +57,11 @@ class RecognitionUI : ComponentActivity() {
         val mode = intent.getStringExtra(MODE)
         val faceEmbedding = intent.getStringExtra(FACE_STRING)
         val faceEmbeddings = intent.getStringArrayListExtra(FACE_STRINGS)
+
+        // subject of recognition
+        val subjectName = intent.getStringExtra(SUBJECT_NAME)
+        val subjectContact = intent.getStringExtra(SUBJECT_CONTACT)
+        val subjectImageUri = intent.getStringExtra(SUBJECT_IMAGE_URI)
 
         Log.e(
             "[intent extras]",
@@ -84,6 +89,9 @@ class RecognitionUI : ComponentActivity() {
                     mode = mode.toRecognitionMode(),
                     faceEmbedding = faceEmbedding,
                     faceEmbeddings = faceEmbeddings ?: emptyList(),
+                    subjectName = subjectName,
+                    subjectContact = subjectContact,
+                    subjectImageUri = subjectImageUri,
                 )
             }
         }
@@ -94,6 +102,9 @@ class RecognitionUI : ComponentActivity() {
         mode: RecognitionMode,
         faceEmbedding: String? = null,
         faceEmbeddings: List<String>,
+        subjectName: String?,
+        subjectContact: String?,
+        subjectImageUri: String?,
     ) {
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -271,22 +282,22 @@ class RecognitionUI : ComponentActivity() {
                             }
                         )
 
-                        images?.let {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(images!!.size) {
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Image(
-                                            bitmap = images!![it].image.asImageBitmap(),
-                                            contentDescription = images!![it].description
-                                        )
-                                        Text(images!![it].description)
-                                    }
-                                }
-                            }
-                        }
+//                        images?.let {
+//                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+//                                items(images!!.size) {
+//                                    Column(
+//                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+//                                        horizontalAlignment = Alignment.CenterHorizontally
+//                                    ) {
+//                                        Image(
+//                                            bitmap = images!![it].image.asImageBitmap(),
+//                                            contentDescription = images!![it].description
+//                                        )
+//                                        Text(images!![it].description)
+//                                    }
+//                                }
+//                            }
+//                        }
 
                     }
 
@@ -317,22 +328,24 @@ class RecognitionUI : ComponentActivity() {
             }
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
                 Column {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp), contentAlignment = Alignment.CenterEnd
-                    ) {
-                        Button(contentPadding = PaddingValues(16.dp), onClick = {
-                            lensFacing.value =
-                                if (lensFacing.value.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.Builder()
-                                    .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-                                    .build() else CameraSelector.Builder()
-                                    .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
-                                    .build()
-                        }) {
-                            Text(stringResource(id = R.string.switch_camera))
-                        }
-                    }
+                    // switch camera button
+                    // todo: implement camera switching to allow user use front facing camera
+//                    Box(
+//                        Modifier
+//                            .fillMaxWidth()
+//                            .padding(16.dp), contentAlignment = Alignment.CenterEnd
+//                    ) {
+//                        Button(contentPadding = PaddingValues(16.dp), onClick = {
+//                            lensFacing.value =
+//                                if (lensFacing.value.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.Builder()
+//                                    .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+//                                    .build() else CameraSelector.Builder()
+//                                    .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+//                                    .build()
+//                        }) {
+//                            Text(stringResource(id = R.string.switch_camera))
+//                        }
+//                    }
                     Box(
                         Modifier
                             .fillMaxWidth()
@@ -344,26 +357,43 @@ class RecognitionUI : ComponentActivity() {
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(60.dp)
-                                        .background(
-                                            color = colorResource(id = R.color.green_500),
-                                            shape = CircleShape,
-                                        ),
-                                ) {
-                                    Text(
-                                        "XX",
-                                        color = MaterialTheme.colors.onPrimary,
-                                        modifier = Modifier.align(Alignment.Center),
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
+                                when (subjectImageUri.isNullOrBlank()) {
+                                    true -> Box(
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .background(
+                                                color = colorResource(id = R.color.green_500),
+                                                shape = CircleShape,
+                                            ),
+                                    ) {
+                                        Text(
+                                            when (subjectName.isNullOrBlank()) {
+                                                true -> "XX"
+                                                false -> subjectName.split(" ")
+                                                    .joinToString { it.first().uppercase() }
+                                            },
+                                            color = MaterialTheme.colors.onPrimary,
+                                            modifier = Modifier.align(Alignment.Center),
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                    false -> AsyncImage(
+                                        model = subjectImageUri,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .clip(CircleShape)
                                     )
                                 }
                                 Column {
-                                    Text("Sample Name", fontWeight = FontWeight.Bold)
-                                    Text("0540000000")
+                                    Text(
+                                        subjectName ?: "Name not found",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(subjectContact ?: "054xxxxxxx")
                                 }
                             }
 
@@ -442,15 +472,16 @@ class RecognitionUI : ComponentActivity() {
         }
 
         BackHandler {
-            closeActivity()
+            Log.d("got here", "back handler")
+            closeActivity(activityResult = Activity.RESULT_CANCELED)
         }
     }
 
-    private fun closeActivity() {
+    private fun closeActivity(activityResult: Int = Activity.RESULT_OK) {
         if (this::recMode.isInitialized) {
             intentResult.putExtra(MODE, recMode)
         }
-        setResult(Activity.RESULT_OK, intentResult)
+        setResult(activityResult, intentResult)
         finish()
     }
 

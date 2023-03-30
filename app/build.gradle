@@ -64,7 +64,8 @@ dependencies {
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_ui_version"
 
     // face recognition
-    implementation 'com.github.mateen-demah:face_recognition:ae65394161'
+//    implementation 'com.github.mateen-demah:face_recognition:ae65394161'
+    implementation project(":face-recognition")
 
     // room database
     def room_version = "2.5.0"

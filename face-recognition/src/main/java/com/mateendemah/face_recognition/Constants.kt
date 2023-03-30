@@ -8,6 +8,9 @@ const val MODEL_IS_QUANTIZED = false
 const val MODE = "mode"
 const val FACE_STRING = "face embedding"
 const val FACE_STRINGS = "face embedding list"
+const val SUBJECT_NAME = "subject_name"
+const val SUBJECT_CONTACT = "subject_contact"
+const val SUBJECT_IMAGE_URI = "subject_image_uri"
 
 const val ENROLL_MODE = "enroll"
 const val VERIFY_MODE = "verify"

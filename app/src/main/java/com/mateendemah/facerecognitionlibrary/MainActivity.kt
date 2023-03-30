@@ -72,9 +72,11 @@ fun Home(faceTestDao: FaceTestDao) {
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()){ result ->
         if (result.resultCode == Activity.RESULT_OK){
+            Log.d("got here", "got here code is ${result.resultCode}")
             val mode = result.data?.getStringExtra(MODE)
             if (mode == ENROLL_MODE){
                 val faceString = result.data?.getStringExtra(FACE_STRING)
+                Log.d("got here", "returned face String = ..$faceString..")
                 faceString?.let {
                     tempEmbedding.value = it
                     showPopUpForEnrollmentComplete.value = true
@@ -191,6 +193,7 @@ fun Home(faceTestDao: FaceTestDao) {
             tempEmbedding.value = embeddings[it.trim().toInt()-1].embedding
             id.value = embeddings[it.trim().toInt()-1].id
             verificationIntent.putExtra(FACE_STRING, tempEmbedding.value)
+            verificationIntent.putExtra(SUBJECT_NAME, embeddings[it.trim().toInt()-1].identifier)
             launcher.launch(verificationIntent)
             showPopUpforStartVerification.value = false
         })
