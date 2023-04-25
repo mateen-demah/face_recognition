@@ -212,7 +212,7 @@ class FaceRecogniser(
         }
         distance = sqrt(distance.toDouble()).toFloat()
         Log.d("VERIFICATION CONFIDENCE", "$distance")
-        return distance < .8f
+        return distance < .65f
     }
 
     private fun faceExists(faceList: List<String>, detectedFace: FloatArray): Boolean {
