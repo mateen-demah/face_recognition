@@ -108,7 +108,7 @@ fun CameraView(
         if (!imageCaptured.value){
             AndroidView({ previewView }, modifier = modifier.then(Modifier.fillMaxSize(),), update = update,)
         } else {
-            Image(painter = rememberAsyncImagePainter(imageUri.value!!), modifier = Modifier.fillMaxSize(), contentDescription = "image for recognition", contentScale = ContentScale.FillBounds,)
+            Image(painter = rememberAsyncImagePainter(imageUri.value!!), modifier = Modifier.fillMaxSize(), contentDescription = "image for recognition", contentScale = ContentScale.Crop,)
         }
 
         Box(
