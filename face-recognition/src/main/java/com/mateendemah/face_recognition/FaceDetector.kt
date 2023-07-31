@@ -1,8 +1,7 @@
 package com.mateendemah.face_recognition
 
-import android.content.Context
-import android.graphics.*
-import android.renderscript.*
+import android.graphics.Bitmap
+import android.graphics.Rect
 import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -10,24 +9,14 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.google.mlkit.vision.face.FaceLandmark
-import kotlin.math.sqrt
+import java.lang.IllegalArgumentException
 
-
-const val TAG = "FACE RECOGNIZER"
 
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
-class FaceRecogniser(
-    context: Context,
-    private val mode: RecognitionMode,
-    private val faceEmbedding: String,
-    private val faceEmbeddings: List<String>,
+class FaceDetector(
     private val drawFaceBoxes: (List<Rect>, imageSize: Pair<Int, Int>) -> Unit,
-    private val onCapture: (images: List<DisplayImage>) -> Unit,
-    private val onFaceDetected: () -> Unit,
-    private val onFaceRecognised: (Embedding) -> Unit,
     private val onErrorDetected: (String) -> Unit,
-    private val onVerificationComplete: ((success: Boolean) -> Unit)? = null,
-) : ImageAnalysis.Analyzer {
+    private val onFaceDetected: () -> Unit,): ImageAnalysis.Analyzer {
 
     private val highAccuracyOpts = FaceDetectorOptions.Builder()
         .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
@@ -36,13 +25,6 @@ class FaceRecogniser(
         .build()
 
     private val detector = FaceDetection.getClient(highAccuracyOpts)
-    private val recogniser = TFLiteObjectDetectionAPIModel.create(
-        context.assets,
-        MODEL_FILENAME,
-        LABELS_FILENAME,
-        MODEL_INPUT_SIZE,
-        MODEL_IS_QUANTIZED
-    )
 
     override fun analyze(image: ImageProxy) {
         val imageBitmap = getBitmap(image)
@@ -134,65 +116,6 @@ class FaceRecogniser(
                         onErrorDetected.invoke("Left eye closed")
                         return@addOnSuccessListener
                     }
-
-                    try {
-                        val faceBitmap = Bitmap.createBitmap(
-                            imageBitmap,
-                            detectedFace.left,
-                            detectedFace.top,
-                            detectedFace.width(),
-                            detectedFace.height(),
-                        )
-                        val scaledFaceBitmap = Bitmap.createScaledBitmap(
-                            faceBitmap,
-                            MODEL_INPUT_SIZE,
-                            MODEL_INPUT_SIZE,
-                            true
-                        )
-
-                        val recognitionResult = recogniser.recognizeImage(scaledFaceBitmap, true)
-                        val embedding = recognitionResult.first().extra
-                        val result = if (recognitionResult.isNotEmpty()) {
-                            Embedding.embeddingStringFromJavaObject(embedding)
-                        } else null
-                        result?.let {
-
-                            if (mode == RecognitionMode.VERIFY) {
-                                val sameFace = isSameFace(faceEmbedding, embedding.first())
-                                onVerificationComplete?.invoke(sameFace)
-                            }
-                            else {
-                                val faceExists = faceExists(faceEmbeddings, embedding.first())
-                                if (faceExists) {
-                                    onErrorDetected.invoke("Face already exists")
-                                    return@addOnSuccessListener
-                                } else {
-                                    onFaceRecognised.invoke(result)
-                                }
-                            }
-                        }
-                        onCapture.invoke(
-                            listOf(
-                                DisplayImage(
-                                    image = imageBitmap, description = "actual image"
-                                ),
-                                DisplayImage(
-                                    image = faceBitmap,
-                                    description = "selected face"
-                                ),
-                                DisplayImage(
-                                    image = scaledFaceBitmap,
-                                    description = "scaled face"
-                                )
-                            ),
-                        )
-                    } catch (ex: java.lang.IllegalArgumentException) {
-                        Log.d(
-                            "FACE BMP CREATION FAILED",
-                            "Face is out of preview bounds: ${ex.stackTraceToString()}"
-                        )
-                        onErrorDetected.invoke("face is not in preview")
-                    }
                 }
             }.addOnFailureListener { exception ->
                 Log.d(TAG, "face detection failed. \n ${exception.stackTraceToString()}")
@@ -200,53 +123,10 @@ class FaceRecogniser(
                 image.close()
             }
         }
-    }
 
-
-    companion object {
-        fun faceExists(faceList: List<String>, detectedFace: FloatArray): Boolean {
-            for (face in faceList){
-                val faceExists = isSameFace(face, detectedFace)
-                if (faceExists) return true
-            }
-            return false
-        }
-
-        fun faceExists(
-            faceList: List<String>,
-            detectedFace: FloatArray,
-            threshold: Float = 0.65f,
-        ): List<String> {
-            val similarFaces = mutableListOf<String>()
-            for (face in faceList) {
-                val faceExists = isSameFace(face, detectedFace, threshold)
-                if (faceExists) similarFaces.add(face)
-            }
-            return similarFaces
-        }
-
-        private fun isSameFace(given: String, detected: FloatArray, threshold: Float): Boolean {
-            val embeddingArray1 = Embedding(given).embeddingStringToJavaObject().first()
-            var distance = 0f
-            for (index in embeddingArray1.indices) {
-                val difference = embeddingArray1[index] - detected[index]
-                distance += difference * difference
-            }
-            distance = sqrt(distance.toDouble()).toFloat()
-            Log.d("VERIFICATION CONFIDENCE", "$distance")
-            return distance < threshold
-        }
-
-        fun isSameFace(given: String, detected: FloatArray): Boolean {
-            val embeddingArray1 = Embedding(given).embeddingStringToJavaObject().first()
-            var distance = 0f
-            for (index in embeddingArray1.indices) {
-                val difference = embeddingArray1[index] - detected[index]
-                distance += difference * difference
-            }
-            distance = sqrt(distance.toDouble()).toFloat()
-            Log.d("VERIFICATION CONFIDENCE", "$distance")
-            return distance < .8f
-        }
+        if(imageBitmap == null){
+            image.close()
         }
     }
+
+}

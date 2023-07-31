@@ -30,8 +30,7 @@ data class Embedding(
 
     companion object {
         fun embeddingStringFromJavaObject(javaArray: Array<FloatArray>): Embedding{
-            return Embedding(javaArray.map { it.toTypedArray().toList() }
-                .toTypedArray().toList().toString())
+            return Embedding(javaArray.map { it.toTypedArray().toList() }.toTypedArray().toList().toString())
         }
 
 

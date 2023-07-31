@@ -73,4 +73,10 @@ dependencies {
     kapt "androidx.room:room-compiler:$room_version"
     implementation "androidx.room:room-ktx:$room_version"
     testImplementation "androidx.room:room-testing:$room_version"
+
+    // mlkit face detection
+    implementation 'com.google.android.gms:play-services-mlkit-face-detection:17.1.0'
+
+    // tflite
+    implementation 'org.tensorflow:tensorflow-lite:+'
 }

@@ -6,4 +6,6 @@
     <string name="verifications">Verifications</string>
     <string name="succeeded">succeeded</string>
     <string name="failed">failed</string>
+    <string name="clear_db">Clear database</string>
+    <string name="load_pictures">Load Pictures</string>
 </resources>
