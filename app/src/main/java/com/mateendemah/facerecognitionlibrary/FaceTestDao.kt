@@ -15,4 +15,7 @@ interface FaceTestDao {
 
     @Query("SELECT * FROM $tableName")
     fun getAll(): List<FaceTest>
+
+    @Query("DELETE FROM $tableName")
+    fun clearDb()
 }
