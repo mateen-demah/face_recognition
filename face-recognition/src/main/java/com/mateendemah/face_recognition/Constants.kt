@@ -5,10 +5,14 @@ const val LABELS_FILENAME = "labelmap.txt"
 const val MODEL_INPUT_SIZE = 112
 const val MODEL_IS_QUANTIZED = false
 
+// activity input extras
 const val MODE = "mode"
 const val FACE_STRING = "face embedding"
 const val FACE_STRINGS = "face embedding list"
-const val SIMILAR_FACE_STRINGS = "similar_face_strings"
+const val EXISTING_FACES = "existing_faces"
+
+// activity output extras
+const val SIMILAR_FACES = "similar_faces"
 const val IMAGE_PATH = "image_path"
 
 const val SUBJECT_NAME = "subject_name"

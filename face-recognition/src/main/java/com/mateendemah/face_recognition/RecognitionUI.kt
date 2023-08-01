@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import android.view.Surface
 import androidx.activity.ComponentActivity
@@ -55,7 +56,6 @@ import coil.compose.AsyncImage
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
-import kotlinx.coroutines.delay
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -75,6 +75,7 @@ class RecognitionUI : ComponentActivity() {
 //    private var shouldShowPhoto: MutableState<Boolean> = mutableStateOf(false)
 
     private lateinit var faceEmbeddings: List<String>
+    private var faces: List<Face>? = null
     private var similarityThreshold by Delegates.notNull<Float>()
 
     override fun onStart() {
@@ -83,6 +84,11 @@ class RecognitionUI : ComponentActivity() {
         val mode = intent.getStringExtra(MODE)
         val faceEmbedding = intent.getStringExtra(FACE_STRING)
         val faceEmbeddings = intent.getStringArrayListExtra(FACE_STRINGS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+            this.faces = intent.getParcelableArrayListExtra(EXISTING_FACES, Face::class.java)?.toList()
+        } else {
+            this.faces = intent.getParcelableArrayListExtra(EXISTING_FACES)
+        }
 
         // subject of recognition
         val subjectName = intent.getStringExtra(SUBJECT_NAME)
@@ -627,9 +633,9 @@ class RecognitionUI : ComponentActivity() {
 
         // attempt face detection
         val inputImage = InputImage.fromBitmap(imgBmp, 0)
-        detector.process(inputImage).addOnSuccessListener { faces ->
-            if (faces.isNotEmpty()) {
-                detectedFace = faces.first().boundingBox
+        detector.process(inputImage).addOnSuccessListener {
+            if (it.isNotEmpty()) {
+                detectedFace = it.first().boundingBox
             }
 
             // attempt recognition
@@ -660,10 +666,11 @@ class RecognitionUI : ComponentActivity() {
                                 embedding
                             )
                         val similarFaces = FaceRecogniser.faceExists(
-                            faceEmbeddings,
+                            faces?.toList()?: emptyList(),
                             embedding.first(),
-                            similarityThreshold
+                            similarityThreshold,
                         )
+                        Log.d("============> similar faces", "$similarFaces")
                         onFaceRecognised(faceString = faceEmbedding.embedding, similarFaces = similarFaces, imagePath = uri.path?:"")
                     }
                     else {
@@ -694,10 +701,10 @@ class RecognitionUI : ComponentActivity() {
         finish()
     }
 
-    private fun onFaceRecognised(faceString: String, similarFaces: List<String>, imagePath: String = "",) {
+    private fun onFaceRecognised(faceString: String, similarFaces: List<Face>, imagePath: String = "",) {
         intentResult.putExtra(FACE_STRING, faceString)
         intentResult.putExtra(IMAGE_PATH, imagePath)
-        intentResult.putStringArrayListExtra(SIMILAR_FACE_STRINGS, ArrayList(similarFaces))
+        intentResult.putParcelableArrayListExtra(SIMILAR_FACES, ArrayList(similarFaces))
         closeActivity()
     }
 

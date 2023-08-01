@@ -89,7 +89,11 @@ fun Home(faceTestDao: FaceTestDao) {
                 val mode = result.data?.getStringExtra(MODE)
                 if (mode == ENROLL_MODE) {
                     val faceString = result.data?.getStringExtra(FACE_STRING)
-                    val similarFaces = result.data?.getStringArrayListExtra(SIMILAR_FACE_STRINGS)
+                    val similarFaces = if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+                         result.data?.getParcelableArrayListExtra(SIMILAR_FACES, Face::class.java)
+                    } else {
+                       result.data?.getParcelableArrayListExtra<Face>(SIMILAR_FACES)
+                    }
                     Log.d("============> got here", "returned face String = ..$faceString..")
                     Log.d("============> got here", "returned face String = ..$similarFaces..")
                     faceString?.let {
@@ -490,6 +494,7 @@ fun Home(faceTestDao: FaceTestDao) {
                             FACE_STRINGS,
                             ArrayList(embeddings.map { it.embedding }),
                         )
+                        enrollIntent.putParcelableArrayListExtra(EXISTING_FACES,ArrayList(embeddings.map{Face(embedding = it.embedding, identifier = it.identifier,)}),)
                         launcher.launch(enrollIntent)
                     }, modifier = Modifier.weight(1f),) {
                         Text(text = stringResource(id = R.string.enroll))

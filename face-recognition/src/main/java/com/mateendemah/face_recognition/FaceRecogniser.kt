@@ -213,13 +213,13 @@ class FaceRecogniser(
         }
 
         fun faceExists(
-            faceList: List<String>,
+            faceList: List<Face>,
             detectedFace: FloatArray,
             threshold: Float = 0.65f,
-        ): List<String> {
-            val similarFaces = mutableListOf<String>()
+        ): List<Face> {
+            val similarFaces = mutableListOf<Face>()
             for (face in faceList) {
-                val faceExists = isSameFace(face, detectedFace, threshold)
+                val faceExists = isSameFace(face.embedding, detectedFace, threshold)
                 if (faceExists) similarFaces.add(face)
             }
             return similarFaces
@@ -233,7 +233,7 @@ class FaceRecogniser(
                 distance += difference * difference
             }
             distance = sqrt(distance.toDouble()).toFloat()
-            Log.d("VERIFICATION CONFIDENCE", "$distance")
+            Log.d("============> CONFIDENCE", "$distance")
             return distance < threshold
         }
 
