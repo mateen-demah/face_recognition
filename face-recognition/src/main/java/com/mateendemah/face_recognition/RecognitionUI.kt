@@ -612,7 +612,6 @@ class RecognitionUI : ComponentActivity() {
                     Button(
                         enabled = recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY || negativeVerificationOverturned.value,
                         onClick = {
-i
                                     onFaceVerificationComplete(
                                         true
                                     )
