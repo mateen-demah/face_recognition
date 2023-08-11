@@ -575,7 +575,7 @@ class RecognitionUI : ComponentActivity() {
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = (overlaySize.height * 0.1).dp),
+                            .padding(top = (overlaySize.height * 0.15).dp),
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center,
                     )
@@ -597,7 +597,7 @@ class RecognitionUI : ComponentActivity() {
                                 },
                                 colors = CheckboxDefaults.colors(
                                     checkmarkColor = Color.White,
-                                    checkedColor = MaterialTheme.colors.primary,
+                                    checkedColor = colorResource(id = R.color.green_500),
                                     uncheckedColor = Color(0xFFE8E8E8),
                                 ),
                             )
