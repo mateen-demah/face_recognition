@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.Checkbox
+import androidx.compose.material.CheckboxDefaults
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.*
@@ -48,8 +50,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
@@ -253,71 +257,74 @@ class RecognitionUI : ComponentActivity() {
             )
         }
 
+        var negativeVerificationOverturned = remember{mutableStateOf(false)}
         AnimatedVisibility(
             visible = mode == RecognitionMode.VERIFY,
             enter = slideInVertically { it },
             exit = slideOutVertically { it },
-            modifier = Modifier.background(Color.White)
+            modifier = Modifier
+                .background(Color.White)
+                .padding(24.dp)
         ) {
             Column {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(
-                            when (mode) {
-                                RecognitionMode.ENROLL -> when (recognitionState.value) {
-                                    RecognitionState.RECOGNISED -> colorResource(id = R.color.green_500)
-                                    else -> Color.White
-                                }
+//                Box(
+//                    Modifier
+//                        .fillMaxWidth()
+//                        .background(
+//                            when (mode) {
+//                                RecognitionMode.ENROLL -> when (recognitionState.value) {
+//                                    RecognitionState.RECOGNISED -> colorResource(id = R.color.green_500)
+//                                    else -> Color.White
+//                                }
+//
+//                                RecognitionMode.VERIFY -> when (recognitionState.value) {
+//                                    RecognitionState.VERIFIED_SUCCESSFULLY -> colorResource(id = R.color.green_500)
+//                                    RecognitionState.VERIFICATION_FAILED -> colorResource(id = R.color.till_red)
+//                                    else -> Color.White
+//                                }
+//                            }
+//                        )
+//                        .padding(vertical = 16.dp), contentAlignment = Alignment.Center
+//                ) {
+//                    when (recognitionState.value) {
+//                        RecognitionState.SEARCHING_FACE -> Text(
+//                            stringResource(R.string.searching_for_face),
+//                            color = Color.Black
+//                        )
+//                        RecognitionState.FACE_DETECTED -> Text(
+//                            stringResource(R.string.faceDetected),
+//                            color = Color.Black
+//                        )
+//                        RecognitionState.RECOGNISING -> Text(
+//                            stringResource(id = R.string.running_recognition),
+//                            color = Color.Black
+//                        )
+//                        RecognitionState.RECOGNISED -> Text(
+//                            stringResource(id = R.string.face_recognition_successful),
+//                            color = when (mode) {
+//                                RecognitionMode.ENROLL -> Color.White
+//                                RecognitionMode.VERIFY -> Color.Black
+//                            }
+//                        )
+//                        RecognitionState.VERIFIED_SUCCESSFULLY -> Row(
+//                            horizontalArrangement = Arrangement.spacedBy(
+//                                16.dp
+//                            )
+//                        ) {
+//                            Text(stringResource(R.string.checkmark))
+//                            Text(stringResource(R.string.successful_verification))
+//                        }
+//                        RecognitionState.VERIFICATION_FAILED -> Text(stringResource(id = R.string.match_failed))
+//                        else -> Text(errorMessage.value, color = colorResource(R.color.till_red))
+//                    }
+//                }
 
-                                RecognitionMode.VERIFY -> when (recognitionState.value) {
-                                    RecognitionState.VERIFIED_SUCCESSFULLY -> colorResource(id = R.color.green_500)
-                                    RecognitionState.VERIFICATION_FAILED -> colorResource(id = R.color.till_red)
-                                    else -> Color.White
-                                }
-                            }
-                        )
-                        .padding(vertical = 16.dp), contentAlignment = Alignment.Center
-                ) {
-                    when (recognitionState.value) {
-                        RecognitionState.SEARCHING_FACE -> Text(
-                            stringResource(R.string.searching_for_face),
-                            color = Color.Black
-                        )
-                        RecognitionState.FACE_DETECTED -> Text(
-                            stringResource(R.string.faceDetected),
-                            color = Color.Black
-                        )
-                        RecognitionState.RECOGNISING -> Text(
-                            stringResource(id = R.string.running_recognition),
-                            color = Color.Black
-                        )
-                        RecognitionState.RECOGNISED -> Text(
-                            stringResource(id = R.string.face_recognition_successful),
-                            color = when (mode) {
-                                RecognitionMode.ENROLL -> Color.White
-                                RecognitionMode.VERIFY -> Color.Black
-                            }
-                        )
-                        RecognitionState.VERIFIED_SUCCESSFULLY -> Row(
-                            horizontalArrangement = Arrangement.spacedBy(
-                                16.dp
-                            )
-                        ) {
-                            Text(stringResource(R.string.checkmark))
-                            Text(stringResource(R.string.successful_verification))
-                        }
-                        RecognitionState.VERIFICATION_FAILED -> Text(stringResource(id = R.string.match_failed))
-                        else -> Text(errorMessage.value, color = colorResource(R.color.till_red))
-                    }
-                }
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(id = R.string.take_a_picture_of_the_farmer_full_face), color = Color(0xFF485465), modifier = Modifier
+                    .padding(vertical = 18.dp)
+                    .padding(bottom = 6.dp), fontSize = 12.sp,)
 
-                        AndroidView(
+                Box{
+                    AndroidView(
                             factory = { ctx ->
                                 val previewView = PreviewView(ctx)
 
@@ -356,7 +363,9 @@ class RecognitionUI : ComponentActivity() {
 
                                 previewView
                             },
-                            modifier = Modifier.onSizeChanged { overlaySize = it.toSize() },
+                            modifier = Modifier.onSizeChanged { overlaySize = it.toSize()
+//                            Log.d("=> Size")
+                                                              },
                             update = {
                                 overlaySize = Size(
                                     it.width.toFloat(),
@@ -364,25 +373,6 @@ class RecognitionUI : ComponentActivity() {
                                 )
                             }
                         )
-
-//                        images?.let {
-//                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-//                                items(images!!.size) {
-//                                    Column(
-//                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-//                                        horizontalAlignment = Alignment.CenterHorizontally
-//                                    ) {
-//                                        Image(
-//                                            bitmap = images!![it].image.asImageBitmap(),
-//                                            contentDescription = images!![it].description
-//                                        )
-//                                        Text(images!![it].description)
-//                                    }
-//                                }
-//                            }
-//                        }
-
-                    }
 
                     Canvas(
                         modifier =
@@ -407,149 +397,234 @@ class RecognitionUI : ComponentActivity() {
                             )
                         }
                     }
+
+                    Box(Modifier.zIndex(2f)) {
+                        Text(
+                            when (recognitionState.value) {
+                                RecognitionState.VERIFICATION_FAILED -> stringResource(id = R.string.face_verification_doesnt_match_message)
+                                else -> stringResource(id = R.string.make_sure_the_farmer_is_at_center)
+                            },
+                            color = when (recognitionState.value) {
+                                RecognitionState.VERIFICATION_FAILED -> Color(0xFFFF4B55)
+                                else -> Color(0xFF0F0F37)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = (overlaySize.height * 0.8).dp)
+                                .padding(bottom = 6.dp),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-                Column {
-                    // switch camera button
-                    // todo: implement camera switching to allow user use front facing camera
+//            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+//                Column {
+//                    // switch camera button
+//                    // todo: implement camera switching to allow user use front facing camera
+////                    Box(
+////                        Modifier
+////                            .fillMaxWidth()
+////                            .padding(16.dp), contentAlignment = Alignment.CenterEnd
+////                    ) {
+////                        Button(contentPadding = PaddingValues(16.dp), onClick = {
+////                            lensFacing.value =
+////                                if (lensFacing.value.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.Builder()
+////                                    .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+////                                    .build() else CameraSelector.Builder()
+////                                    .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+////                                    .build()
+////                        }) {
+////                            Text(stringResource(id = R.string.switch_camera))
+////                        }
+////                    }
 //                    Box(
 //                        Modifier
 //                            .fillMaxWidth()
-//                            .padding(16.dp), contentAlignment = Alignment.CenterEnd
+//                            .background(Color.White)
+//                            .padding(16.dp)
 //                    ) {
-//                        Button(contentPadding = PaddingValues(16.dp), onClick = {
-//                            lensFacing.value =
-//                                if (lensFacing.value.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.Builder()
-//                                    .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-//                                    .build() else CameraSelector.Builder()
-//                                    .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
-//                                    .build()
-//                        }) {
-//                            Text(stringResource(id = R.string.switch_camera))
+//                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+//                            Row(
+//                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+//                                verticalAlignment = Alignment.CenterVertically
+//                            ) {
+//                                when (subjectImageUri.isNullOrBlank()) {
+//                                    true -> Box(
+//                                        modifier = Modifier
+//                                            .size(60.dp)
+//                                            .background(
+//                                                color = colorResource(id = R.color.green_500),
+//                                                shape = CircleShape,
+//                                            ),
+//                                    ) {
+//                                        Text(
+//                                            when (subjectName.isNullOrBlank()) {
+//                                                true -> "XX"
+//                                                false -> subjectName.split(" ")
+//                                                    .joinToString { it.first().uppercase() }
+//                                            },
+//                                            color = MaterialTheme.colors.onPrimary,
+//                                            modifier = Modifier.align(Alignment.Center),
+//                                            overflow = TextOverflow.Ellipsis,
+//                                            textAlign = TextAlign.Center,
+//                                            maxLines = 1,
+//                                        )
+//                                    }
+//                                    false -> AsyncImage(
+//                                        model = subjectImageUri,
+//                                        contentDescription = null,
+//                                        contentScale = ContentScale.Crop,
+//                                        modifier = Modifier
+//                                            .size(60.dp)
+//                                            .clip(CircleShape)
+//                                    )
+//                                }
+//                                Column {
+//                                    Text(
+//                                        subjectName ?: "Name not found",
+//                                        fontWeight = FontWeight.Bold
+//                                    )
+//                                    Text(subjectContact ?: "054xxxxxxx")
+//                                }
+//                            }
+//
+//                            when (recognitionState.value) {
+//                                RecognitionState.VERIFICATION_FAILED -> Row(
+//                                    horizontalArrangement = Arrangement.spacedBy(
+//                                        16.dp
+//                                    )
+//                                ) {
+//                                    Button(
+//                                        onClick = { closeActivity() },
+//                                        modifier = Modifier
+//                                            .fillMaxWidth()
+//                                            .weight(1f),
+//                                        contentPadding = PaddingValues(vertical = 16.dp),
+//                                        colors = ButtonDefaults.buttonColors(
+//                                            backgroundColor = colorResource(
+//                                                id = R.color.green_500
+//                                            ), contentColor = Color.White
+//                                        )
+//                                    ) {
+//                                        Text(stringResource(id = R.string.close))
+//                                    }
+//                                    Button(
+//                                        onClick = { /*TODO*/ },
+//                                        modifier = Modifier
+//                                            .fillMaxWidth()
+//                                            .weight(1f),
+//                                        contentPadding = PaddingValues(vertical = 16.dp),
+//                                        colors = ButtonDefaults.buttonColors(
+//                                            backgroundColor = colorResource(
+//                                                id = R.color.green_500
+//                                            ), contentColor = Color.White
+//                                        )
+//                                    ) {
+//                                        Text(stringResource(id = R.string.retry))
+//                                    }
+//                                }
+//                                else -> Button(
+//                                    enabled = when (mode) {
+//                                        RecognitionMode.ENROLL -> recognitionState.value == RecognitionState.RECOGNISED
+//                                        RecognitionMode.VERIFY -> recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY
+//                                    },
+//                                    onClick = {
+//                                        when (mode) {
+//                                            RecognitionMode.ENROLL -> onFaceRecognised(
+//                                                detectedEmbedding.value.embedding,
+//                                                emptyList(),
+//                                            )
+//                                            RecognitionMode.VERIFY -> {
+//                                                onFaceVerificationComplete(
+//                                                    recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY
+//                                                )
+//                                            }
+//                                        }
+//                                    },
+//                                    modifier = Modifier.fillMaxWidth(),
+//                                    contentPadding = PaddingValues(vertical = 16.dp),
+//                                    colors = ButtonDefaults.buttonColors(
+//                                        backgroundColor = colorResource(
+//                                            id = R.color.green_500
+//                                        ), contentColor = Color.White
+//                                    )
+//                                ) {
+//                                    Text(
+//                                        text = when (mode) {
+//                                            RecognitionMode.ENROLL -> stringResource(id = R.string.enroll)
+//                                            RecognitionMode.VERIFY -> stringResource(id = R.string.proceed)
+//                                        }
+//                                    )
+//                                }
+//                            }
 //                        }
 //                    }
-                    Box(
-                        Modifier
+//                }
+//            }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter){
+                Column(Modifier.fillMaxHeight(0.5f)){
+                    Text(
+                        when (recognitionState.value) {
+                            RecognitionState.VERIFICATION_FAILED -> stringResource(id = R.string.face_verification_doesnt_match_message)
+                            else -> stringResource(id = R.string.make_sure_the_farmer_is_at_center)
+                        },
+                        color = when (recognitionState.value) {
+                            RecognitionState.VERIFICATION_FAILED -> Color(0xFFFF4B55)
+                            else -> Color(0xFF0F0F37)
+                        },
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White)
-                            .padding(16.dp)
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                when (subjectImageUri.isNullOrBlank()) {
-                                    true -> Box(
-                                        modifier = Modifier
-                                            .size(60.dp)
-                                            .background(
-                                                color = colorResource(id = R.color.green_500),
-                                                shape = CircleShape,
-                                            ),
-                                    ) {
-                                        Text(
-                                            when (subjectName.isNullOrBlank()) {
-                                                true -> "XX"
-                                                false -> subjectName.split(" ")
-                                                    .joinToString { it.first().uppercase() }
-                                            },
-                                            color = MaterialTheme.colors.onPrimary,
-                                            modifier = Modifier.align(Alignment.Center),
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 1,
-                                        )
-                                    }
-                                    false -> AsyncImage(
-                                        model = subjectImageUri,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(60.dp)
-                                            .clip(CircleShape)
-                                    )
-                                }
-                                Column {
-                                    Text(
-                                        subjectName ?: "Name not found",
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(subjectContact ?: "054xxxxxxx")
-                                }
-                            }
+                            .padding(top = (overlaySize.height * 0.1).dp),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                    )
 
-                            when (recognitionState.value) {
-                                RecognitionState.VERIFICATION_FAILED -> Row(
-                                    horizontalArrangement = Arrangement.spacedBy(
-                                        16.dp
-                                    )
-                                ) {
-                                    Button(
-                                        onClick = { closeActivity() },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .weight(1f),
-                                        contentPadding = PaddingValues(vertical = 16.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            backgroundColor = colorResource(
-                                                id = R.color.green_500
-                                            ), contentColor = Color.White
-                                        )
-                                    ) {
-                                        Text(stringResource(id = R.string.close))
-                                    }
-                                    Button(
-                                        onClick = { /*TODO*/ },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .weight(1f),
-                                        contentPadding = PaddingValues(vertical = 16.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            backgroundColor = colorResource(
-                                                id = R.color.green_500
-                                            ), contentColor = Color.White
-                                        )
-                                    ) {
-                                        Text(stringResource(id = R.string.retry))
-                                    }
-                                }
-                                else -> Button(
-                                    enabled = when (mode) {
-                                        RecognitionMode.ENROLL -> recognitionState.value == RecognitionState.RECOGNISED
-                                        RecognitionMode.VERIFY -> recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY
-                                    },
-                                    onClick = {
-                                        when (mode) {
-                                            RecognitionMode.ENROLL -> onFaceRecognised(
-                                                detectedEmbedding.value.embedding,
-                                                emptyList(),
-                                            )
-                                            RecognitionMode.VERIFY -> {
-                                                onFaceVerificationComplete(
-                                                    recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY
-                                                )
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    contentPadding = PaddingValues(vertical = 16.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        backgroundColor = colorResource(
-                                            id = R.color.green_500
-                                        ), contentColor = Color.White
-                                    )
-                                ) {
-                                    Text(
-                                        text = when (mode) {
-                                            RecognitionMode.ENROLL -> stringResource(id = R.string.enroll)
-                                            RecognitionMode.VERIFY -> stringResource(id = R.string.proceed)
-                                        }
-                                    )
-                                }
-                            }
+                    Spacer(Modifier.weight(1f))
+
+                    if(recognitionState.value == RecognitionState.VERIFICATION_FAILED){
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.padding(top = 4.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Checkbox(
+                                modifier = Modifier.size(24.dp),
+                                checked = negativeVerificationOverturned.value,
+                                onCheckedChange = {
+                                    negativeVerificationOverturned.value =
+                                        !negativeVerificationOverturned.value
+                                },
+                                colors = CheckboxDefaults.colors(
+                                    checkmarkColor = Color.White,
+                                    checkedColor = MaterialTheme.colors.primary,
+                                    uncheckedColor = Color(0xFFE8E8E8),
+                                ),
+                            )
+                            Text(
+                                stringResource(id = R.string.i_can_confirm_that_this_is_the_image_of_the_farmer_selected),
+                                color = Color(0xFF7D8CA3),
+                            )
                         }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        enabled = recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY || negativeVerificationOverturned.value,
+                        onClick = {
+i
+                                    onFaceVerificationComplete(
+                                        true
+                                    )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = colorResource(
+                                id = R.color.green_500
+                            ), contentColor = Color.White
+                        ),){
+                        Text(stringResource(id = R.string.confirm))
                     }
                 }
             }
