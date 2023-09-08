@@ -4,8 +4,6 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
@@ -15,7 +13,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.*
+import androidx.camera.core.AspectRatio
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
@@ -23,32 +25,43 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Checkbox
 import androidx.compose.material.CheckboxDefaults
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
@@ -56,10 +69,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.mateendemah.face_recognition.composables.MessagesBanner
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -75,11 +85,8 @@ class RecognitionUI : ComponentActivity() {
 
     private var shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
 
-    private lateinit var photoUri: Uri
-//    private var shouldShowPhoto: MutableState<Boolean> = mutableStateOf(false)
-
     private lateinit var faceEmbeddings: List<String>
-    private var faces: List<Face>? = null
+    private var existingFaces: List<Face>? = null
     private var similarityThreshold by Delegates.notNull<Float>()
 
     override fun onStart() {
@@ -88,16 +95,12 @@ class RecognitionUI : ComponentActivity() {
         val mode = intent.getStringExtra(MODE)
         val faceEmbedding = intent.getStringExtra(FACE_STRING)
         val faceEmbeddings = intent.getStringArrayListExtra(FACE_STRINGS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
-            this.faces = intent.getParcelableArrayListExtra(EXISTING_FACES, Face::class.java)?.toList()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            this.existingFaces =
+                intent.getParcelableArrayListExtra(EXISTING_FACES, Face::class.java)?.toList()
         } else {
-            this.faces = intent.getParcelableArrayListExtra(EXISTING_FACES)
+            this.existingFaces = intent.getParcelableArrayListExtra(EXISTING_FACES)
         }
-
-        // subject of recognition
-        val subjectName = intent.getStringExtra(SUBJECT_NAME)
-        val subjectContact = intent.getStringExtra(SUBJECT_CONTACT)
-        val subjectImageUri = intent.getStringExtra(SUBJECT_IMAGE_URI)
 
         Log.e(
             "[intent extras]",
@@ -120,7 +123,7 @@ class RecognitionUI : ComponentActivity() {
 
         requestCameraPermission()
 
-        this.faceEmbeddings = faceEmbeddings?: emptyList()
+        this.faceEmbeddings = faceEmbeddings ?: emptyList()
         this.similarityThreshold = intent.getFloatExtra(SIMILARITY_THRESHOLD, 0.65f)
 
         outputDirectory = getOutputDirectory()
@@ -132,10 +135,6 @@ class RecognitionUI : ComponentActivity() {
                 RecognitionUi(
                     mode = mode.toRecognitionMode(),
                     faceEmbedding = faceEmbedding,
-                    faceEmbeddings = faceEmbeddings ?: emptyList(),
-                    subjectName = subjectName,
-                    subjectContact = subjectContact,
-                    subjectImageUri = subjectImageUri,
                 )
             }
         }
@@ -156,10 +155,6 @@ class RecognitionUI : ComponentActivity() {
     fun RecognitionUi(
         mode: RecognitionMode,
         faceEmbedding: String? = null,
-        faceEmbeddings: List<String>,
-        subjectName: String?,
-        subjectContact: String?,
-        subjectImageUri: String?,
     ) {
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -170,19 +165,19 @@ class RecognitionUI : ComponentActivity() {
 
         var boundingBoxes by remember { mutableStateOf<List<Rect>>(emptyList()) }
 
-        var images by remember { mutableStateOf<List<DisplayImage>?>(null) }
-
         val errorMessage = remember { mutableStateOf("") }
-        val detectedEmbedding = remember { mutableStateOf(Embedding("")) }
+        val detectedEmbedding = remember { mutableStateOf<Array<FloatArray>?>(null) }
 
         val recognitionState = remember { mutableStateOf(RecognitionState.SEARCHING_FACE) }
+        val recognitionStarted = remember { mutableStateOf(mode == RecognitionMode.VERIFY) }
+        val enrollmentImageCapture: ImageCapture = remember { ImageCapture.Builder().build() }
+        val imageUri = remember { mutableStateOf<Uri?>(null) }
 
         val faceRecogniser = remember(mode) {
             FaceRecogniser(
                 context = context,
                 mode = mode,
                 faceEmbedding = faceEmbedding ?: "",
-                faceEmbeddings = faceEmbeddings,
                 drawFaceBoxes = { faces, _imgSize ->
                     boundingBoxes = faces
                     imgSize = _imgSize.first to _imgSize.second
@@ -190,15 +185,25 @@ class RecognitionUI : ComponentActivity() {
                         recognitionState.value = RecognitionState.SEARCHING_FACE
                     }
                 },
-                onCapture = { dispImages ->
-                    images = dispImages
-                },
                 onFaceDetected = {
                     recognitionState.value = RecognitionState.FACE_DETECTED
                 },
                 onFaceRecognised = {
+                    recognitionStarted.value = false
                     recognitionState.value = RecognitionState.RECOGNISED
                     detectedEmbedding.value = it
+                    takePhoto(
+                        filenameFormat = "yyyy-MM-dd-HH-mm-ss-SSS",
+                        imageCapture = enrollmentImageCapture,
+                        outputDirectory = outputDirectory,
+                        executor = cameraExecutor,
+                        onImageCaptured = { it1 ->
+                            imageUri.value = it1
+                        },
+                        onError = { it1 ->
+                            Log.d(TAG, "=============> Checkpoint onError $it1<==============")
+                        },
+                    )
                 },
                 onErrorDetected = {
                     recognitionState.value = RecognitionState.SHOW_ERROR_MESSAGE
@@ -208,37 +213,7 @@ class RecognitionUI : ComponentActivity() {
                     recognitionState.value =
                         if (it) RecognitionState.VERIFIED_SUCCESSFULLY else RecognitionState.VERIFICATION_FAILED
                 },
-            )
-        }
-
-
-
-        val errorMsg = remember { mutableStateOf<String?>(null) }
-        val showError = remember(errorMsg){ errorMsg.value != null }
-        val faceDetector = remember {
-            FaceDetector(
-                drawFaceBoxes = { faces, _imgSize ->
-                    boundingBoxes = faces
-                    imgSize = _imgSize.first to _imgSize.second
-                    if (boundingBoxes.isEmpty()) {
-                        recognitionState.value = RecognitionState.SEARCHING_FACE
-                    }
-                },
-                onErrorDetected = {
-                    errorMsg.value = it
-                },
-                onFaceDetected = {
-                    recognitionState.value = RecognitionState.FACE_DETECTED
-                }
-            )
-        }
-        val recogniser = remember{
-            TFLiteObjectDetectionAPIModel.create(
-                context.assets,
-                MODEL_FILENAME,
-                LABELS_FILENAME,
-                MODEL_INPUT_SIZE,
-                MODEL_IS_QUANTIZED
+                shouldDoRecognition = { recognitionStarted.value },
             )
         }
 
@@ -257,7 +232,7 @@ class RecognitionUI : ComponentActivity() {
             )
         }
 
-        var negativeVerificationOverturned = remember{mutableStateOf(false)}
+        val negativeVerificationOverturned = remember { mutableStateOf(false) }
         AnimatedVisibility(
             visible = mode == RecognitionMode.VERIFY,
             enter = slideInVertically { it },
@@ -267,112 +242,66 @@ class RecognitionUI : ComponentActivity() {
                 .padding(24.dp)
         ) {
             Column {
-//                Box(
-//                    Modifier
-//                        .fillMaxWidth()
-//                        .background(
-//                            when (mode) {
-//                                RecognitionMode.ENROLL -> when (recognitionState.value) {
-//                                    RecognitionState.RECOGNISED -> colorResource(id = R.color.green_500)
-//                                    else -> Color.White
-//                                }
-//
-//                                RecognitionMode.VERIFY -> when (recognitionState.value) {
-//                                    RecognitionState.VERIFIED_SUCCESSFULLY -> colorResource(id = R.color.green_500)
-//                                    RecognitionState.VERIFICATION_FAILED -> colorResource(id = R.color.till_red)
-//                                    else -> Color.White
-//                                }
-//                            }
-//                        )
-//                        .padding(vertical = 16.dp), contentAlignment = Alignment.Center
-//                ) {
-//                    when (recognitionState.value) {
-//                        RecognitionState.SEARCHING_FACE -> Text(
-//                            stringResource(R.string.searching_for_face),
-//                            color = Color.Black
-//                        )
-//                        RecognitionState.FACE_DETECTED -> Text(
-//                            stringResource(R.string.faceDetected),
-//                            color = Color.Black
-//                        )
-//                        RecognitionState.RECOGNISING -> Text(
-//                            stringResource(id = R.string.running_recognition),
-//                            color = Color.Black
-//                        )
-//                        RecognitionState.RECOGNISED -> Text(
-//                            stringResource(id = R.string.face_recognition_successful),
-//                            color = when (mode) {
-//                                RecognitionMode.ENROLL -> Color.White
-//                                RecognitionMode.VERIFY -> Color.Black
-//                            }
-//                        )
-//                        RecognitionState.VERIFIED_SUCCESSFULLY -> Row(
-//                            horizontalArrangement = Arrangement.spacedBy(
-//                                16.dp
-//                            )
-//                        ) {
-//                            Text(stringResource(R.string.checkmark))
-//                            Text(stringResource(R.string.successful_verification))
-//                        }
-//                        RecognitionState.VERIFICATION_FAILED -> Text(stringResource(id = R.string.match_failed))
-//                        else -> Text(errorMessage.value, color = colorResource(R.color.till_red))
-//                    }
-//                }
+                Text(
+                    stringResource(id = R.string.take_a_picture_of_the_farmer_full_face),
+                    color = Color(0xFF485465),
+                    modifier = Modifier
+                        .padding(vertical = 18.dp)
+                        .padding(bottom = 6.dp),
+                    fontSize = 12.sp,
+                )
 
-                Text(stringResource(id = R.string.take_a_picture_of_the_farmer_full_face), color = Color(0xFF485465), modifier = Modifier
-                    .padding(vertical = 18.dp)
-                    .padding(bottom = 6.dp), fontSize = 12.sp,)
-
-                Box{
+                Box {
                     AndroidView(
-                            factory = { ctx ->
-                                val previewView = PreviewView(ctx)
+                        factory = { ctx ->
+                            val previewView = PreviewView(ctx)
 
-                                val executor = ContextCompat.getMainExecutor(ctx)
-                                val faceRecognitionUseCase =
-                                    ImageAnalysis.Builder().setTargetResolution(
-                                        android.util.Size(
-                                            previewView.width,
-                                            previewView.height
-                                        )
+                            val executor = ContextCompat.getMainExecutor(ctx)
+                            val faceRecognitionUseCase =
+                                ImageAnalysis.Builder().setTargetResolution(
+                                    android.util.Size(
+                                        previewView.width,
+                                        previewView.height
                                     )
-                                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                        .build().apply {
-                                            setAnalyzer(executor, faceRecogniser)
-                                        }
-                                cameraProviderFuture.addListener(
-                                    {
-                                        val cameraProvider = cameraProviderFuture.get()
-                                        val preview = Preview.Builder().build().also {
-                                            it.setSurfaceProvider(previewView.surfaceProvider)
-                                        }
-
-                                        val cameraSelector = lensFacing.value
-
-                                        cameraProvider.unbindAll()
-                                        cameraProvider.bindToLifecycle(
-                                            lifecycleOwner,
-                                            cameraSelector,
-                                            imageCapture,
-                                            faceRecognitionUseCase,
-                                            preview
-                                        )
-                                    },
-                                    executor,
                                 )
+                                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                    .build().apply {
+                                        setAnalyzer(executor, faceRecogniser)
+                                    }
+                            cameraProviderFuture.addListener(
+                                {
+                                    val cameraProvider = cameraProviderFuture.get()
+                                    val preview = Preview.Builder().build().also {
+                                        it.setSurfaceProvider(previewView.surfaceProvider)
+                                    }
 
-                                previewView
-                            },
-                            modifier = Modifier.onSizeChanged { overlaySize = it.toSize()
+                                    val cameraSelector = lensFacing.value
+
+                                    cameraProvider.unbindAll()
+                                    cameraProvider.bindToLifecycle(
+                                        lifecycleOwner,
+                                        cameraSelector,
+                                        imageCapture,
+                                        faceRecognitionUseCase,
+                                        preview
+                                    )
+                                },
+                                executor,
+                            )
+
+                            previewView
+                        },
+                        modifier = Modifier.onSizeChanged {
+                            overlaySize = it.toSize()
 //                            Log.d("=> Size")
-                                                              },
-                            update = {
-                                overlaySize = Size(
-                                    it.width.toFloat(),
-                                    it.height.toFloat(),
-                                )
-                            }
-                        )
+                        },
+                        update = {
+                            overlaySize = Size(
+                                it.width.toFloat(),
+                                it.height.toFloat(),
+                            )
+                        }
+                    )
 
                     Canvas(
                         modifier =
@@ -418,152 +347,9 @@ class RecognitionUI : ComponentActivity() {
                     }
                 }
             }
-//            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-//                Column {
-//                    // switch camera button
-//                    // todo: implement camera switching to allow user use front facing camera
-////                    Box(
-////                        Modifier
-////                            .fillMaxWidth()
-////                            .padding(16.dp), contentAlignment = Alignment.CenterEnd
-////                    ) {
-////                        Button(contentPadding = PaddingValues(16.dp), onClick = {
-////                            lensFacing.value =
-////                                if (lensFacing.value.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.Builder()
-////                                    .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-////                                    .build() else CameraSelector.Builder()
-////                                    .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
-////                                    .build()
-////                        }) {
-////                            Text(stringResource(id = R.string.switch_camera))
-////                        }
-////                    }
-//                    Box(
-//                        Modifier
-//                            .fillMaxWidth()
-//                            .background(Color.White)
-//                            .padding(16.dp)
-//                    ) {
-//                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-//                            Row(
-//                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-//                                verticalAlignment = Alignment.CenterVertically
-//                            ) {
-//                                when (subjectImageUri.isNullOrBlank()) {
-//                                    true -> Box(
-//                                        modifier = Modifier
-//                                            .size(60.dp)
-//                                            .background(
-//                                                color = colorResource(id = R.color.green_500),
-//                                                shape = CircleShape,
-//                                            ),
-//                                    ) {
-//                                        Text(
-//                                            when (subjectName.isNullOrBlank()) {
-//                                                true -> "XX"
-//                                                false -> subjectName.split(" ")
-//                                                    .joinToString { it.first().uppercase() }
-//                                            },
-//                                            color = MaterialTheme.colors.onPrimary,
-//                                            modifier = Modifier.align(Alignment.Center),
-//                                            overflow = TextOverflow.Ellipsis,
-//                                            textAlign = TextAlign.Center,
-//                                            maxLines = 1,
-//                                        )
-//                                    }
-//                                    false -> AsyncImage(
-//                                        model = subjectImageUri,
-//                                        contentDescription = null,
-//                                        contentScale = ContentScale.Crop,
-//                                        modifier = Modifier
-//                                            .size(60.dp)
-//                                            .clip(CircleShape)
-//                                    )
-//                                }
-//                                Column {
-//                                    Text(
-//                                        subjectName ?: "Name not found",
-//                                        fontWeight = FontWeight.Bold
-//                                    )
-//                                    Text(subjectContact ?: "054xxxxxxx")
-//                                }
-//                            }
-//
-//                            when (recognitionState.value) {
-//                                RecognitionState.VERIFICATION_FAILED -> Row(
-//                                    horizontalArrangement = Arrangement.spacedBy(
-//                                        16.dp
-//                                    )
-//                                ) {
-//                                    Button(
-//                                        onClick = { closeActivity() },
-//                                        modifier = Modifier
-//                                            .fillMaxWidth()
-//                                            .weight(1f),
-//                                        contentPadding = PaddingValues(vertical = 16.dp),
-//                                        colors = ButtonDefaults.buttonColors(
-//                                            backgroundColor = colorResource(
-//                                                id = R.color.green_500
-//                                            ), contentColor = Color.White
-//                                        )
-//                                    ) {
-//                                        Text(stringResource(id = R.string.close))
-//                                    }
-//                                    Button(
-//                                        onClick = { /*TODO*/ },
-//                                        modifier = Modifier
-//                                            .fillMaxWidth()
-//                                            .weight(1f),
-//                                        contentPadding = PaddingValues(vertical = 16.dp),
-//                                        colors = ButtonDefaults.buttonColors(
-//                                            backgroundColor = colorResource(
-//                                                id = R.color.green_500
-//                                            ), contentColor = Color.White
-//                                        )
-//                                    ) {
-//                                        Text(stringResource(id = R.string.retry))
-//                                    }
-//                                }
-//                                else -> Button(
-//                                    enabled = when (mode) {
-//                                        RecognitionMode.ENROLL -> recognitionState.value == RecognitionState.RECOGNISED
-//                                        RecognitionMode.VERIFY -> recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY
-//                                    },
-//                                    onClick = {
-//                                        when (mode) {
-//                                            RecognitionMode.ENROLL -> onFaceRecognised(
-//                                                detectedEmbedding.value.embedding,
-//                                                emptyList(),
-//                                            )
-//                                            RecognitionMode.VERIFY -> {
-//                                                onFaceVerificationComplete(
-//                                                    recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY
-//                                                )
-//                                            }
-//                                        }
-//                                    },
-//                                    modifier = Modifier.fillMaxWidth(),
-//                                    contentPadding = PaddingValues(vertical = 16.dp),
-//                                    colors = ButtonDefaults.buttonColors(
-//                                        backgroundColor = colorResource(
-//                                            id = R.color.green_500
-//                                        ), contentColor = Color.White
-//                                    )
-//                                ) {
-//                                    Text(
-//                                        text = when (mode) {
-//                                            RecognitionMode.ENROLL -> stringResource(id = R.string.enroll)
-//                                            RecognitionMode.VERIFY -> stringResource(id = R.string.proceed)
-//                                        }
-//                                    )
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter){
-                Column(Modifier.fillMaxHeight(0.5f)){
+
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                Column(Modifier.fillMaxHeight(0.5f)) {
                     Text(
                         when (recognitionState.value) {
                             RecognitionState.VERIFICATION_FAILED -> stringResource(id = R.string.face_verification_doesnt_match_message)
@@ -582,7 +368,7 @@ class RecognitionUI : ComponentActivity() {
 
                     Spacer(Modifier.weight(1f))
 
-                    if(recognitionState.value == RecognitionState.VERIFICATION_FAILED){
+                    if (recognitionState.value == RecognitionState.VERIFICATION_FAILED) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.padding(top = 4.dp),
@@ -612,9 +398,8 @@ class RecognitionUI : ComponentActivity() {
                     Button(
                         enabled = recognitionState.value == RecognitionState.VERIFIED_SUCCESSFULLY || negativeVerificationOverturned.value,
                         onClick = {
-                                    onFaceVerificationComplete(
-                                        true
-                                    )
+                            onFaceVerificationComplete(
+                            )
                         },
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(vertical = 16.dp),
@@ -622,7 +407,8 @@ class RecognitionUI : ComponentActivity() {
                             backgroundColor = colorResource(
                                 id = R.color.green_500
                             ), contentColor = Color.White
-                        ),){
+                        ),
+                    ) {
                         Text(stringResource(id = R.string.confirm))
                     }
                 }
@@ -634,136 +420,76 @@ class RecognitionUI : ComponentActivity() {
             enter = slideInVertically { it },
             exit = slideOutVertically { it },
             modifier = Modifier.background(Color.White)
-        ){
-            Box {
-                Column {
-                    AnimatedVisibility(visible = showError) {
-                        errorMsg.value?.let {
-                            Text(
-                                it, color = Color.Red, modifier = Modifier
-                                    .padding(vertical = 8.dp)
-                                    .align(alignment = Alignment.CenterHorizontally)
-                            )
-                        }
-                    }
+        ) {
+            Column {
+                MessagesBanner(
+                    errorMessage = errorMessage,
+                    showBanner = recognitionStarted,
+                    recognitionState = recognitionState,
+                )
+                Box {
                     CameraView(
-                        outputDirectory = outputDirectory,
                         executor = cameraExecutor,
-                        onImageCaptured = { handleImageCapture(it, recogniser) },
-                        onError = {},
-                        faceDetector = faceDetector,
-                        modifier = Modifier, //.onSizeChanged { overlaySize = it.toSize() },
+                        imageCapture = enrollmentImageCapture,
+                        faceDetector = faceRecogniser,
+                        modifier = Modifier,
                         update = {
                             overlaySize = Size(
                                 it.width.toFloat(),
                                 it.height.toFloat(),
                             )
                         },
+                        shouldStartFrameProcessing = recognitionStarted,
+                        imageUri = imageUri,
+                        saveAndClose = {
+                            val detectedFace = Embedding.embeddingStringFromJavaObject(
+                                detectedEmbedding.value!!
+                            ).embedding
+                            val similarFaces = FaceRecogniser.faceExists(
+                                faceList = existingFaces?.toList() ?: emptyList(),
+                                detectedFace = detectedEmbedding.value!!,
+                                similarityThreshold,
+                            )
+                            Log.d("============> checkpoint similar faces", "$similarFaces")
+                            Log.d("============> checkpoint detected face", detectedFace)
+                            onFaceRecognised(
+                                faceString = detectedFace,
+                                similarFaces = similarFaces,
+                                imagePath = imageUri.value?.path ?: ""
+                            )
+                        }
                     )
-                }
 
-                Canvas(
-                    modifier =
-                    Modifier
-                        .height(overlaySize.height.dp)
-                        .width(overlaySize.width.dp),
-                ) {
-                    for (box in boundingBoxes) {
-                        val rect = box.transformToRectF(
-                            imgSize = imgSize,
-                            previewHeight = overlaySize.height,
-                            previewWidth = overlaySize.width,
-                            lensFacing = lensFacing.value.lensFacing!!,
-                        )
+                    Canvas(
+                        modifier =
+                        Modifier
+                            .height(overlaySize.height.dp)
+                            .width(overlaySize.width.dp),
+                    ) {
+                        for (box in boundingBoxes) {
+                            val rect = box.transformToRectF(
+                                imgSize = imgSize,
+                                previewHeight = overlaySize.height,
+                                previewWidth = overlaySize.width,
+                                lensFacing = lensFacing.value.lensFacing!!,
+                            )
 
-                        drawRoundRect(
-                            color = Color.White,
-                            topLeft = Offset(rect.left, rect.top),
-                            size = Size(rect.width(), rect.height()),
-                            cornerRadius = CornerRadius(4f, 4f),
-                            style = Stroke(width = 2f),
-                        )
+                            drawRoundRect(
+                                color = Color.White,
+                                topLeft = Offset(rect.left, rect.top),
+                                size = Size(rect.width(), rect.height()),
+                                cornerRadius = CornerRadius(4f, 4f),
+                                style = Stroke(width = 2f),
+                            )
+                        }
                     }
                 }
             }
         }
-        
+
         BackHandler {
             Log.d("got here", "back handler")
             closeActivity(activityResult = Activity.RESULT_CANCELED)
-        }
-    }
-
-    val highAccuracyOpts = FaceDetectorOptions.Builder()
-        .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-        .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-        .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-        .build()
-    private val detector = FaceDetection.getClient(highAccuracyOpts)
-    private fun handleImageCapture(uri: Uri, recogniser: SimilarityClassifier){
-        // load image as bitmap
-        val imgBmp = BitmapFactory.decodeFile(uri.path)
-        var detectedFace: Rect? = null
-
-        // attempt face detection
-        val inputImage = InputImage.fromBitmap(imgBmp, 0)
-        detector.process(inputImage).addOnSuccessListener {
-            if (it.isNotEmpty()) {
-                detectedFace = it.first().boundingBox
-            }
-
-            // attempt recognition
-            detectedFace?.let { bounds ->
-                try {
-                    val faceBitmap = Bitmap.createBitmap(
-                        imgBmp,
-                        bounds.left,
-                        bounds.top,
-                        bounds.width(),
-                        bounds.height(),
-                    )
-                    val scaledFaceBitmap = Bitmap.createScaledBitmap(
-                        faceBitmap,
-                        MODEL_INPUT_SIZE,
-                        MODEL_INPUT_SIZE,
-                        true
-                    )
-
-                    val recognitionResult = recogniser.recognizeImage(
-                        scaledFaceBitmap,
-                        true
-                    )
-                    val embedding = recognitionResult.first().extra
-                    if (recognitionResult.isNotEmpty()) {
-                        val faceEmbedding =
-                            Embedding.embeddingStringFromJavaObject(
-                                embedding
-                            )
-                        val similarFaces = FaceRecogniser.faceExists(
-                            faces?.toList()?: emptyList(),
-                            embedding.first(),
-                            similarityThreshold,
-                        )
-                        Log.d("============> similar faces", "$similarFaces")
-                        onFaceRecognised(faceString = faceEmbedding.embedding, similarFaces = similarFaces, imagePath = uri.path?:"")
-                    }
-                    else {
-                        closeActivity(ACTIVITY_FAILED)
-                    }
-                } catch (ex: Exception) {
-                    Log.d(
-                        "FACE RECOGNITION ERROR",
-                        ex.stackTraceToString()
-                    )
-                    closeActivity(ACTIVITY_FAILED)
-                }
-            }
-        }.addOnFailureListener { exception ->
-            Log.d(
-                "FACE DETECTION",
-                "face detection failed. \n ${exception.stackTraceToString()}"
-            )
-            closeActivity(ACTIVITY_FAILED)
         }
     }
 
@@ -775,15 +501,19 @@ class RecognitionUI : ComponentActivity() {
         finish()
     }
 
-    private fun onFaceRecognised(faceString: String, similarFaces: List<Face>, imagePath: String = "",) {
+    private fun onFaceRecognised(
+        faceString: String,
+        similarFaces: List<Face>,
+        imagePath: String = "",
+    ) {
         intentResult.putExtra(FACE_STRING, faceString)
         intentResult.putExtra(IMAGE_PATH, imagePath)
         intentResult.putParcelableArrayListExtra(SIMILAR_FACES, ArrayList(similarFaces))
         closeActivity()
     }
 
-    private fun onFaceVerificationComplete(success: Boolean) {
-        intentResult.putExtra(VERIFICATION_SUCCESSFUL, success)
+    private fun onFaceVerificationComplete() {
+        intentResult.putExtra(VERIFICATION_SUCCESSFUL, true)
         closeActivity()
     }
 
@@ -798,6 +528,7 @@ class RecognitionUI : ComponentActivity() {
             Log.i("kilo", "Permission denied")
         }
     }
+
     private fun requestCameraPermission() {
         when {
             ContextCompat.checkSelfPermission(
