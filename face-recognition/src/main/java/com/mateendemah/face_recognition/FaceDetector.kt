@@ -1,0 +1,132 @@
+package com.mateendemah.face_recognition
+
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.util.Log
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.FaceLandmark
+import java.lang.IllegalArgumentException
+
+
+@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
+class FaceDetector(
+    private val drawFaceBoxes: (List<Rect>, imageSize: Pair<Int, Int>) -> Unit,
+    private val onErrorDetected: (String) -> Unit,
+    private val onFaceDetected: () -> Unit,): ImageAnalysis.Analyzer {
+
+    private val highAccuracyOpts = FaceDetectorOptions.Builder()
+        .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+        .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+        .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+        .build()
+
+    private val detector = FaceDetection.getClient(highAccuracyOpts)
+
+    override fun analyze(image: ImageProxy) {
+        val imageBitmap = getBitmap(image)
+
+        imageBitmap?.let {
+            val inputImage = InputImage.fromBitmap(imageBitmap, 0)
+
+            val rotation = image.imageInfo.rotationDegrees
+            val reverseDim = rotation == 90 || rotation == 270
+            val imgSize = if(reverseDim) Pair(image.image?.height?:0, image.image?.width?:0) else Pair(inputImage.width, inputImage.height)
+
+            detector.process(inputImage).addOnSuccessListener { faces ->
+                drawFaceBoxes.invoke(faces.map { it.boundingBox }, imgSize)
+
+                if (faces.size > 1) {
+                    onErrorDetected.invoke("Multiple faces detected")
+                }
+                else if (faces.size == 1) {
+
+                    val face = faces.first()
+
+                    onFaceDetected.invoke()
+                    val detectedFace = faces.first().boundingBox
+
+                    // face landmarks
+                    val leftEar = face.getLandmark(FaceLandmark.LEFT_EAR)
+                    val rightEar = face.getLandmark(FaceLandmark.LEFT_EAR)
+                    val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)
+                    val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)
+                    val leftCheek = face.getLandmark(FaceLandmark.LEFT_CHEEK)
+                    val rightCheek = face.getLandmark(FaceLandmark.RIGHT_CHEEK)
+                    val mouthBottom = face.getLandmark(FaceLandmark.MOUTH_BOTTOM)
+                    val mouthLeft = face.getLandmark(FaceLandmark.MOUTH_LEFT)
+                    val mouthRight = face.getLandmark(FaceLandmark.MOUTH_RIGHT)
+                    val noseBase = face.getLandmark(FaceLandmark.NOSE_BASE)
+
+                    Log.e("[landmark]", rightEar?.position.toString())
+
+
+                    // return if landmarks aren't available
+                    when (null) {
+                        face.getLandmark(FaceLandmark.LEFT_EAR) -> {
+                            onErrorDetected.invoke("Left Ear not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.RIGHT_EAR) -> {
+                            onErrorDetected.invoke("right Ear not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.LEFT_EYE) -> {
+                            onErrorDetected.invoke("Left Eye not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.RIGHT_EYE) -> {
+                            onErrorDetected.invoke("Right eye not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.LEFT_CHEEK) -> {
+                            onErrorDetected.invoke("Left cheek not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.RIGHT_CHEEK) -> {
+                            onErrorDetected.invoke("Left Ear not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.MOUTH_BOTTOM) -> {
+                            onErrorDetected.invoke("Bottom part of mouth not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.MOUTH_RIGHT) -> {
+                            onErrorDetected.invoke("Right part of mouth not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.MOUTH_LEFT) -> {
+                            onErrorDetected.invoke("Left part of mouth not visible")
+                            return@addOnSuccessListener
+                        }
+                        face.getLandmark(FaceLandmark.NOSE_BASE) -> {
+                            onErrorDetected.invoke("Nose is not visible")
+                            return@addOnSuccessListener
+                        }
+                    }
+
+                    // return if eyes are closed
+                    if (face.leftEyeOpenProbability == null || face.leftEyeOpenProbability!! < 0.35) {
+                        onErrorDetected.invoke("Right eye closed")
+                        return@addOnSuccessListener
+                    } else if (face.rightEyeOpenProbability == null || face.rightEyeOpenProbability!! < 0.35) {
+                        onErrorDetected.invoke("Left eye closed")
+                        return@addOnSuccessListener
+                    }
+                }
+            }.addOnFailureListener { exception ->
+                Log.d(TAG, "face detection failed. \n ${exception.stackTraceToString()}")
+            }.addOnCompleteListener {
+                image.close()
+            }
+        }
+
+        if(imageBitmap == null){
+            image.close()
+        }
+    }
+
+}

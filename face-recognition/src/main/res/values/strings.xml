@@ -16,4 +16,15 @@
     <string name="close">Close</string>
     <string name="retry">Retry</string>
     <string name="switch_camera">Switch camera</string>
+    <string name="i_can_confirm_that_this_is_the_image_of_the_farmer_selected">I can confirm that this is the image of the farmer selected</string>
+    <string name="confirm">Confirm</string>
+    <string name="take_a_picture_of_the_farmer_full_face">Take a picture of the farmer\'s full face</string>
+    <string name="make_sure_the_farmer_is_at_center">Make sure the farmer is at the center of the frame.</string>
+    <string name="face_verification_doesnt_match_message">Face verification doesn\'t match with the selected farmer</string>
+    <string name="no_face_detected">No face detected</string>
+    <string name="start_scan">Start scan</string>
+    <string name="tap_to_start_scan">Tap to start scan</string>
+    <string name="rescan">Rescan</string>
+    <string name="save">Save</string>
+    <string name="scanning">Scanning</string>
 </resources>
